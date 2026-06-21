@@ -1,0 +1,1 @@
+"""File text extraction helpers."""
