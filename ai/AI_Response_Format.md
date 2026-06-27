@@ -2,14 +2,14 @@
 
 ## Objective
 
-Define the standard JSON shape returned by AI insight endpoints or internal AI services. This format is designed for dashboard cards, API clients, and future persistence into the proposed `ai_insights` table.
+Define the standard JSON shape returned by AI insight endpoints or internal AI services. This format is designed for dashboard cards, API clients, and optional future persistence if the ERD adds an AI insight table.
 
 ## Schema
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `success` | boolean | Yes | Whether insight generation succeeded. |
-| `insight_id` | integer/string/null | No | Persisted `ai_insights.id`, or null before persistence. |
+| `insight_id` | integer/string/null | No | Persisted insight ID if a matching ERD table is added, or null before persistence. |
 | `title` | string | Yes | Short dashboard-ready title. |
 | `type` | string | Yes | Insight type, such as `risk`, `recommendation`, `activity`, `workload`, or `processing_error`. |
 | `severity` | string | Yes | `low`, `medium`, `high`, or `critical`. |
@@ -36,7 +36,6 @@ Allowed `entity_type` values should include:
 - `project`
 - `task`
 - `meeting`
-- `knowledge_document`
 - `user`
 - `upload`
 
@@ -45,9 +44,9 @@ Allowed `entity_type` values should include:
 ```json
 {
   "source_type": "meeting_summary",
-  "table": "meetings",
+  "table": "meeting_summary",
   "id": 73,
-  "field": "summary",
+  "field": "summary_text",
   "snippet": "The payment integration remains blocked by missing credentials."
 }
 ```
@@ -83,14 +82,14 @@ Allowed `entity_type` values should include:
   "sources": [
     {
       "source_type": "task",
-      "table": "tasks",
+      "table": "task",
       "id": 901,
       "field": "due_date",
       "snippet": "Due date is before today's date and status is in_progress."
     },
     {
       "source_type": "meeting_summary",
-      "table": "meetings",
+      "table": "meeting_summary",
       "id": 73,
       "field": "summary",
       "snippet": "Payment integration is waiting for credentials."

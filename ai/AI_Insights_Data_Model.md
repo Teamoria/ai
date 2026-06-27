@@ -2,36 +2,36 @@
 
 ## Objective
 
-Define the proposed storage model for AI-generated insights without duplicating existing Teamoria tables. The current codebase already stores users, projects, tasks, meetings, decisions, uploaded knowledge documents, and knowledge chunks. The `ai_insights` table should act as a normalized output layer that links AI findings back to those existing records.
+Define the proposed storage model for AI-generated insights without duplicating existing Teamoria tables. The ERD stores the main AI-related records in `company`, `project`, `task`, `meeting_summary`, `extracted_decision`, `upload`, and `knowledge_chunk`. AI findings should link back to those existing records instead of inventing alternate table names.
 
 ## Current Codebase Mapping
 
 | Business concept | Current table/model |
 | --- | --- |
-| Company / tenant | `organizations` |
-| User | `users` |
-| Project | `projects` |
-| Task | `tasks` |
-| Meeting summary | `meetings.summary` |
-| Extracted decisions | `decisions` |
-| Uploaded documents | `knowledge_documents`, `meeting_files`, `task_files` |
-| Knowledge chunks | `knowledge_chunks` |
+| Company / tenant | `company` |
+| User | `user` |
+| Project | `project` |
+| Task | `task` |
+| Meeting summary | `meeting_summary` |
+| Extracted decisions | `extracted_decision` |
+| Uploaded files/documents | `upload` |
+| Knowledge chunks | `knowledge_chunk` |
 
-Note: this project does not currently contain an `ai_insights` model/table. It also does not contain separate `meeting_summaries`, `extracted_decisions`, or `uploads` tables by those exact names.
+Note: this project should use the ERD table names above. Avoid references to `organizations`, `users`, `projects`, `tasks`, `meetings`, `knowledge_documents`, `meeting_files`, `task_files`, `meeting_summaries`, `extracted_decisions`, or `uploads` as database table names.
 
 ## Proposed Schema
 
-Table name: `ai_insights`
+Table name: `ai_insight` only if this table is later added to the ERD. Until then, return this shape as an API payload and link it to existing ERD tables.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer / bigint | Yes | Primary key. |
-| `company_id` | integer | Yes | References `organizations.id`. Named `company_id` for product language; maps to organization internally. |
-| `user_id` | integer | No | References `users.id`; the user who triggered or owns the insight. |
-| `project_id` | integer | No | References `projects.id` when the insight is project-related. |
-| `task_id` | integer | No | References `tasks.id` when the insight is task-related. |
-| `meeting_summary_id` | integer | No | References `meetings.id`; the summary is stored in `meetings.summary`. |
-| `upload_id` | integer | No | References `knowledge_documents.id` for uploaded knowledge sources. For meeting/task files, store the table name in `metadata.source_table`. |
+| `company_id` | integer | Yes | References `company.id`. |
+| `user_id` | integer | No | References `user.id`; the user who triggered or owns the insight. |
+| `project_id` | integer | No | References `project.id` when the insight is project-related. |
+| `task_id` | integer | No | References `task.id` when the insight is task-related. |
+| `meeting_summary_id` | integer | No | References `meeting_summary.id`. |
+| `upload_id` | integer | No | References `upload.id` for uploaded files or knowledge sources. |
 | `title` | varchar(255) | Yes | Human-readable insight title. |
 | `type` | varchar(60) | Yes | Insight category, such as `risk`, `recommendation`, `workload`, `progress`, `processing_error`. |
 | `severity` | varchar(40) | Yes | `low`, `medium`, `high`, or `critical`. |
@@ -47,20 +47,20 @@ Table name: `ai_insights`
 
 ```mermaid
 erDiagram
-    organizations ||--o{ ai_insights : owns
-    users ||--o{ ai_insights : triggers
-    projects ||--o{ ai_insights : relates_to
-    tasks ||--o{ ai_insights : relates_to
-    meetings ||--o{ ai_insights : generated_from_summary
-    knowledge_documents ||--o{ ai_insights : generated_from_upload
+    company ||--o{ ai_insight : owns
+    user ||--o{ ai_insight : triggers
+    project ||--o{ ai_insight : relates_to
+    task ||--o{ ai_insight : relates_to
+    meeting_summary ||--o{ ai_insight : generated_from_summary
+    upload ||--o{ ai_insight : generated_from_upload
 ```
 
 ## Rules
 
-- Do not create duplicate meeting summary storage. Use `meetings.summary`.
-- Do not create duplicate decision storage. Use `decisions`.
-- Use `knowledge_documents` as the primary uploaded-document reference when the source is a knowledge upload.
-- Use `metadata.source_table` and `metadata.source_id` when the source is `meeting_files` or `task_files`.
+- Do not create duplicate meeting summary storage. Use `meeting_summary`.
+- Do not create duplicate decision storage. Use `extracted_decision`.
+- Use `upload` as the primary uploaded-file/document reference.
+- Use `metadata.source_table = "upload"` and `metadata.source_id` for uploaded file evidence.
 - One insight may reference multiple evidence sources inside `metadata.sources` even if the core relational fields point to the primary source.
 
 ## Example Record
@@ -83,7 +83,7 @@ erDiagram
   "status": "new",
   "metadata": {
     "rule": "overdue_task",
-    "source_table": "tasks",
+    "source_table": "task",
     "source_id": 901,
     "days_overdue": 5,
     "task_status": "in_progress"

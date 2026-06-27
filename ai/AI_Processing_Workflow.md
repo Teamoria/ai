@@ -13,13 +13,13 @@ flowchart TD
     C --> D[Extract text or transcribe media]
     D --> E[Detect document type]
     E --> F[Generate summary with LlmService]
-    F --> G[Create meetings record]
+    F --> G[Create meeting_summary record]
     G --> H[Index summary and transcript chunks in VectorStore]
     G --> I[Extract action items with TaskExtractor]
-    I --> J[Create tasks with pending_manager_review]
+    I --> J[Create task records with pending_manager_review]
     H --> K[Chat and RAG can search indexed content]
     J --> L[Manager reviews tasks]
-    G --> M[Future insight rules generate ai_insights]
+    G --> M[Future insight rules generate AI response payloads]
     J --> M
     M --> N[Recommendations]
     N --> O[Dashboard]
@@ -39,15 +39,15 @@ sequenceDiagram
     participant Dashboard
 
     User->>API: Upload meeting/document
-    API->>Upload: process(file, project_id, organization_id)
+    API->>Upload: process(file, project_id, company_id)
     Upload->>DB: Save meeting transcript and summary
     Upload->>LLM: Summarize transcript
-    Upload->>DB: Create tasks from extracted action items
+    Upload->>DB: Create task records from extracted action items
     Upload->>Vector: Index summary/transcript chunks
-    Rules->>DB: Read projects, tasks, meetings, knowledge_documents
+    Rules->>DB: Read project, task, meeting_summary, upload
     Rules->>Rules: Detect risks, workload, inactivity, processing failures
-    Rules->>DB: Store ai_insights
-    Dashboard->>DB: Read ai_insights and related entities
+    Rules->>DB: Return AI insight payload or store in an ERD-approved table later
+    Dashboard->>DB: Read insight payloads and related entities
     Dashboard-->>User: Show insights and recommendations
 ```
 
@@ -58,30 +58,28 @@ sequenceDiagram
 | Upload | `backend/app/api/v1/meetings.py` and `UploadProcessor` | Saved file and processed text. |
 | Processing | `UploadProcessor._detect_source_type`, `_extract_text`, `_detect_document_type` | Source type and document type. |
 | Transcript / text extraction | `Transcriber` for media, file readers for text/PDF/DOCX | Transcript text. |
-| Summary | `LlmService.summarize` | `meetings.summary`. |
+| Summary | `LlmService.summarize` | `meeting_summary`. |
 | Chunking | `VectorStore._meeting_documents` chunks transcript every 1600 characters | Vector-ready summary/transcript chunks. |
 | Embedding / vector indexing | `VectorStore.index_meeting` | Pinecone records when configured. |
-| Task extraction | `TaskExtractor.extract` | `tasks` with `pending_manager_review`. |
-| Insights | Proposed rule engine | `ai_insights`. |
+| Task extraction | `TaskExtractor.extract` | `task` with `pending_manager_review`. |
+| Insights | Proposed rule engine | AI response payload, or an ERD-approved insight table later. |
 | Recommendations | Proposed recommendation generator | Structured recommendation JSON. |
 | Dashboard | Future UI/API consumer | Insight cards, risk panels, workload warnings. |
 
 ## Fields and Rules
 
-- Meeting summaries should continue to use `meetings.summary`.
-- Extracted decisions should continue to use `decisions`.
-- Uploaded knowledge files should use `knowledge_documents`.
-- Meeting upload artifacts can use `meeting_files`.
-- Task attachments can use `task_files`.
-- Knowledge chunks should use `knowledge_chunks`.
-- New AI insight output should be stored in the proposed `ai_insights` table only if persistence is required.
+- Meeting summaries should use `meeting_summary`.
+- Extracted decisions should use `extracted_decision`.
+- Uploaded files and knowledge documents should use `upload`.
+- Knowledge chunks should use `knowledge_chunk`.
+- New AI insight output should remain an API payload unless an ERD-approved insight table is added.
 
 ## Practical Example
 
 1. A manager uploads a meeting recording.
-2. The service transcribes it and stores the transcript in `meetings.transcript`.
-3. The AI summary is stored in `meetings.summary`.
-4. Action items become `tasks` with `pending_manager_review`.
+2. The service transcribes it and stores the transcript in `meeting_summary`.
+3. The AI summary is stored in `meeting_summary`.
+4. Action items become `task` records with `pending_manager_review`.
 5. The summary and transcript are indexed in Pinecone through `VectorStore`.
 6. The insight rules detect that one extracted task is high priority and overdue.
 7. The recommendation generator suggests assigning a backup owner.

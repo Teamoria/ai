@@ -27,7 +27,7 @@ Confidence is a decimal number from `0.00` to `1.00`.
 
 ## Rules
 
-- Store confidence in `ai_insights.confidence_score` as a numeric decimal.
+- Store confidence in the AI response payload as a numeric decimal. If the ERD later adds an insight table, persist it in that approved table.
 - Return confidence in API responses as a JSON number.
 - Round to two decimal places for storage and display.
 - Do not use percentages in API payloads.
@@ -57,4 +57,4 @@ Confidence is a decimal number from `0.00` to `1.00`.
 
 ## Practical Example
 
-An overdue task insight based only on `tasks.due_date` and `tasks.status` should receive high confidence because both signals are structured. A project-risk insight inferred only from a meeting transcript should receive lower confidence unless it is supported by task or project data.
+An overdue task insight based only on `task.due_date` and `task.status` should receive high confidence because both signals are structured. A project-risk insight inferred only from a meeting transcript should receive lower confidence unless it is supported by task or project data.

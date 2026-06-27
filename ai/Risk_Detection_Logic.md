@@ -8,13 +8,13 @@ Define how Teamoria AI detects project and task risk using the existing project,
 
 | Input | Source | Notes |
 | --- | --- | --- |
-| Project status | `projects.status` | Only active projects should generate active risk warnings. |
-| Project deadline | `projects.end_date` | Used for schedule pressure. |
-| Task due date | `tasks.due_date` | Used for overdue and upcoming-deadline risk. |
-| Task status | `tasks.status` | Open, in-progress, blocked, pending review, or done. |
-| Task priority | `tasks.priority` | Used to increase risk when important work is delayed. |
-| Meeting summary | `meetings.summary` | Used to detect blockers mentioned in natural language. |
-| Activity timestamps | `projects.updated_at`, `tasks.created_at`, `meetings.created_at`, `knowledge_documents.created_at` | Used for inactivity risk. |
+| Project status | `project.status` | Only active projects should generate active risk warnings. |
+| Project deadline | `project.end_date` | Used for schedule pressure. |
+| Task due date | `task.due_date` | Used for overdue and upcoming-deadline risk. |
+| Task status | `task.status` | Open, in-progress, blocked, pending review, or done. |
+| Task priority | `task.priority` | Used to increase risk when important work is delayed. |
+| Meeting summary | `meeting_summary` | Used to detect blockers mentioned in natural language. |
+| Activity timestamps | `project.updated_at`, `task.created_at`, `meeting_summary.created_at`, `upload.created_at` | Used for inactivity risk. |
 
 ## Risk Levels
 

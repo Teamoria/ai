@@ -1105,21 +1105,22 @@ Response:
 
 ## 14. Database Tables
 
-Required AI tables:
+When the AI Service reads from or writes to Teamoria business data, use the ERD table names:
 
-- `ai_chat_sessions`
-- `ai_chat_messages`
-- `knowledge_chunks`
-- `embeddings`
-- `meeting_summaries`
-- `meeting_decisions`
-- `extracted_tasks`
-- `ai_sources`
-- `ai_feedback`
-- `agent_runs`
-- `agent_run_steps`
+- `company`
+- `user`
+- `upload`
+- `meeting_summary`
+- `extracted_decision`
+- `knowledge_chunk`
+- `project`
+- `project_user`
+- `task`
+- `task_user`
+- `task_dependency`
+- `task_note`
 
-These tables can live in the same PostgreSQL database if the team agrees, or in a separate AI database. The important part is that IDs from PHP tables are passed clearly to the AI Service.
+Do not refer to alternate table names such as `organizations`, `users`, `knowledge_documents`, `meeting_files`, `task_files`, `meetings`, `projects`, `tasks`, `knowledge_chunks`, `meeting_summaries`, `meeting_decisions`, or `extracted_tasks` as database tables. Any additional AI-only persistence tables, such as chat history or agent run logs, should be added only after the ERD is updated and approved.
 
 ---
 
