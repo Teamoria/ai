@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="980" viewBox="0 0 1400 980" role="img" aria-labelledby="title desc">
+  <title id="title">Teamoria Upload Processing Architecture</title>
+  <desc id="desc">End to end upload flow from frontend file upload to AI processing, MySQL persistence, preview, and AI results display.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 15px Arial, sans-serif; fill: #475569; }
+      .lane-title { font: 700 17px Arial, sans-serif; fill: #1e293b; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 12; }
+      .box-blue { fill: #eff6ff; stroke: #60a5fa; }
+      .box-green { fill: #ecfdf5; stroke: #34d399; }
+      .box-amber { fill: #fffbeb; stroke: #f59e0b; }
+      .box-purple { fill: #f5f3ff; stroke: #a78bfa; }
+      .box-red { fill: #fef2f2; stroke: #f87171; }
+      .label { font: 700 15px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 400 13px Arial, sans-serif; fill: #334155; }
+      .tiny { font: 400 12px Arial, sans-serif; fill: #64748b; }
+      .arrow { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 6 6; marker-end: url(#arrow); }
+      .lane { fill: #ffffff; stroke: #e2e8f0; stroke-width: 2; rx: 18; }
+      .pill { fill: #e2e8f0; rx: 14; }
+      .pill-text { font: 700 12px Arial, sans-serif; fill: #334155; }
+      .code { font: 600 12px Consolas, monospace; fill: #1e293b; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="980"/>
+  <text class="title" x="48" y="54">Teamoria Upload Processing Flow</text>
+  <text class="subtitle" x="48" y="82">From frontend upload to file preview, AI transcription, summaries, decisions, tasks, knowledge chunks, and MySQL persistence.</text>
+
+  <rect class="lane" x="40" y="120" width="300" height="760"/>
+  <text class="lane-title" x="64" y="154">Frontend</text>
+  <rect class="pill" x="64" y="170" width="184" height="28"/>
+  <text class="pill-text" x="78" y="189">React Upload Center</text>
+
+  <rect class="lane" x="380" y="120" width="310" height="760"/>
+  <text class="lane-title" x="404" y="154">FastAPI AI Service</text>
+  <rect class="pill" x="404" y="170" width="215" height="28"/>
+  <text class="pill-text" x="418" y="189">localhost:3001 /api/v1</text>
+
+  <rect class="lane" x="730" y="120" width="300" height="760"/>
+  <text class="lane-title" x="754" y="154">AI Processing</text>
+  <rect class="pill" x="754" y="170" width="218" height="28"/>
+  <text class="pill-text" x="768" y="189">Background Thread Job</text>
+
+  <rect class="lane" x="1070" y="120" width="290" height="760"/>
+  <text class="lane-title" x="1094" y="154">Persistence & Results</text>
+  <rect class="pill" x="1094" y="170" width="188" height="28"/>
+  <text class="pill-text" x="1108" y="189">Remote MySQL</text>
+
+  <!-- Frontend blocks -->
+  <rect class="box box-blue" x="70" y="230" width="230" height="96"/>
+  <text class="label" x="92" y="260">1. User Selects File</text>
+  <text class="small" x="92" y="284">PDF, DOCX, text, image,</text>
+  <text class="small" x="92" y="304">audio, or video file.</text>
+
+  <rect class="box box-blue" x="70" y="375" width="230" height="118"/>
+  <text class="label" x="92" y="405">2. Submit FormData</text>
+  <text class="code" x="92" y="430">POST /uploads</text>
+  <text class="small" x="92" y="454">fields: files, scope,</text>
+  <text class="small" x="92" y="474">visibility, company_id</text>
+
+  <rect class="box box-blue" x="70" y="720" width="230" height="110"/>
+  <text class="label" x="92" y="750">8. Display Results</text>
+  <text class="small" x="92" y="774">Preview modal shows file.</text>
+  <text class="small" x="92" y="794">AI modal shows transcript,</text>
+  <text class="small" x="92" y="814">summary, tasks, chunks.</text>
+
+  <!-- API blocks -->
+  <rect class="box box-green" x="420" y="230" width="230" height="108"/>
+  <text class="label" x="442" y="260">3. uploads.py</text>
+  <text class="code" x="442" y="284">upload_files()</text>
+  <text class="small" x="442" y="308">Reads multipart form</text>
+  <text class="small" x="442" y="328">and validates scope.</text>
+
+  <rect class="box box-green" x="420" y="385" width="230" height="122"/>
+  <text class="label" x="442" y="415">4. Save File + Row</text>
+  <text class="small" x="442" y="439">File saved under:</text>
+  <text class="code" x="442" y="462">tmp/uploads</text>
+  <text class="small" x="442" y="486">Upload row inserted.</text>
+
+  <rect class="box box-green" x="420" y="555" width="230" height="110"/>
+  <text class="label" x="442" y="585">5. Return Quickly</text>
+  <text class="small" x="442" y="609">Response includes upload_id</text>
+  <text class="small" x="442" y="629">with status queued.</text>
+  <text class="small" x="442" y="649">Processing runs separately.</text>
+
+  <!-- AI blocks -->
+  <rect class="box box-amber" x="765" y="230" width="230" height="110"/>
+  <text class="label" x="787" y="260">6. ProcessUploadJob</text>
+  <text class="small" x="787" y="284">Sets status to processing.</text>
+  <text class="small" x="787" y="304">Closes DB connection</text>
+  <text class="small" x="787" y="324">during long AI work.</text>
+
+  <rect class="box box-amber" x="765" y="385" width="230" height="130"/>
+  <text class="label" x="787" y="415">7. Extract Content</text>
+  <text class="small" x="787" y="439">Text/PDF/DOCX readers</text>
+  <text class="small" x="787" y="459">or media transcription.</text>
+  <text class="code" x="787" y="484">Groq Whisper</text>
+  <text class="tiny" x="787" y="503">whisper-large-v3-turbo</text>
+
+  <rect class="box box-amber" x="765" y="560" width="230" height="142"/>
+  <text class="label" x="787" y="590">8. Intelligence</text>
+  <text class="small" x="787" y="614">Generate summary,</text>
+  <text class="small" x="787" y="634">decisions, and tasks.</text>
+  <text class="code" x="787" y="659">Groq LLM</text>
+  <text class="tiny" x="787" y="678">llama-3.3-70b-versatile</text>
+
+  <rect class="box box-amber" x="765" y="745" width="230" height="96"/>
+  <text class="label" x="787" y="775">9. Chunks + Embeddings</text>
+  <text class="small" x="787" y="799">Split transcript into chunks.</text>
+  <text class="small" x="787" y="819">Store local embeddings.</text>
+
+  <!-- Persistence blocks -->
+  <rect class="box box-purple" x="1105" y="230" width="220" height="118"/>
+  <text class="label" x="1127" y="260">uploads</text>
+  <text class="small" x="1127" y="284">File metadata</text>
+  <text class="small" x="1127" y="304">scope, visibility, path</text>
+  <text class="small" x="1127" y="324">processing_status</text>
+
+  <rect class="box box-purple" x="1105" y="385" width="220" height="108"/>
+  <text class="label" x="1127" y="415">meeting_summaries</text>
+  <text class="small" x="1127" y="439">transcript</text>
+  <text class="small" x="1127" y="459">summary</text>
+
+  <rect class="box box-purple" x="1105" y="530" width="220" height="126"/>
+  <text class="label" x="1127" y="560">Extracted Tables</text>
+  <text class="small" x="1127" y="584">extracted_decisions</text>
+  <text class="small" x="1127" y="604">extracted_tasks</text>
+  <text class="small" x="1127" y="624">knowledge_chunks</text>
+
+  <rect class="box box-purple" x="1105" y="700" width="220" height="118"/>
+  <text class="label" x="1127" y="730">Read APIs</text>
+  <text class="code" x="1127" y="754">GET /uploads</text>
+  <text class="code" x="1127" y="774">GET /uploads/{id}</text>
+  <text class="code" x="1127" y="794">GET /download</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M 300 278 C 345 278 370 278 420 278"/>
+  <path class="arrow" d="M 300 434 C 345 434 370 434 420 434"/>
+  <path class="arrow" d="M 535 338 L 535 385"/>
+  <path class="arrow" d="M 650 446 C 700 446 715 284 765 284"/>
+  <path class="arrow" d="M 535 507 L 535 555"/>
+  <path class="dash" d="M 650 610 C 700 610 715 800 765 800"/>
+  <path class="arrow" d="M 995 285 C 1045 285 1055 285 1105 285"/>
+  <path class="arrow" d="M 995 450 C 1045 450 1055 438 1105 438"/>
+  <path class="arrow" d="M 995 632 C 1045 632 1055 594 1105 594"/>
+  <path class="arrow" d="M 995 792 C 1045 792 1055 760 1105 760"/>
+  <path class="dash" d="M 1105 760 C 900 910 320 910 185 830"/>
+
+  <!-- Notes -->
+  <rect class="box box-red" x="70" y="890" width="1255" height="54"/>
+  <text class="label" x="92" y="922">Production Note:</text>
+  <text class="small" x="222" y="922">Frontend should call the main backend. The AI service is currently used directly for upload processing during integration/testing.</text>
+</svg>

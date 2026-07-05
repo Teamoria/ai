@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1700" viewBox="0 0 1900 1700" role="img" aria-labelledby="title desc">
+  <title id="title">Teamoria AI Upload Processing Flow</title>
+  <desc id="desc">Clear flowchart for upload processing from frontend to PHP backend, AI service, external services, database, and frontend display.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#23443d"/>
+    </marker>
+    <style>
+      .bg { fill: #f6faf8; }
+      .title { font: 700 38px Arial, sans-serif; fill: #12362f; }
+      .subtitle { font: 400 19px Arial, sans-serif; fill: #526963; }
+      .lane { fill: #eef8f4; stroke: #b6d8cb; stroke-width: 2; rx: 20; }
+      .laneTitle { font: 700 24px Arial, sans-serif; fill: #183f37; }
+      .box { stroke-width: 2.5; rx: 16; }
+      .frontend { fill: #eaf7ff; stroke: #4c8fbd; }
+      .php { fill: #ebfff5; stroke: #289b70; }
+      .ai { fill: #f1f6ff; stroke: #557fca; }
+      .external { fill: #fff4e6; stroke: #c7892e; }
+      .db { fill: #f5edff; stroke: #9467c7; }
+      .result { fill: #fff0f0; stroke: #d56b6b; }
+      .decision { fill: #fffbe8; stroke: #c5a42e; stroke-width: 2.5; }
+      .label { font: 700 19px Arial, sans-serif; fill: #143b34; }
+      .text { font: 400 16px Arial, sans-serif; fill: #354c46; }
+      .tiny { font: 400 14px Arial, sans-serif; fill: #566b65; }
+      .edge { fill: none; stroke: #23443d; stroke-width: 3; marker-end: url(#arrow); }
+      .edgeLight { fill: none; stroke: #68817a; stroke-width: 2.5; marker-end: url(#arrow); }
+      .dash { fill: none; stroke: #87652c; stroke-width: 2.5; stroke-dasharray: 9 8; marker-end: url(#arrow); }
+      .note { fill: #ffffff; stroke: #d7e4de; stroke-width: 1.5; rx: 12; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1900" height="1700"/>
+  <text class="title" x="950" y="58" text-anchor="middle">Teamoria AI Upload Processing Flow</text>
+  <text class="subtitle" x="950" y="92" text-anchor="middle">PHP owns authentication, storage, and database persistence. AI Service returns processing output.</text>
+
+  <!-- Lanes -->
+  <rect class="lane" x="70" y="140" width="310" height="1370"/>
+  <text class="laneTitle" x="225" y="180" text-anchor="middle">Frontend</text>
+
+  <rect class="lane" x="430" y="140" width="350" height="1370"/>
+  <text class="laneTitle" x="605" y="180" text-anchor="middle">PHP Backend</text>
+
+  <rect class="lane" x="830" y="140" width="510" height="1370"/>
+  <text class="laneTitle" x="1085" y="180" text-anchor="middle">FastAPI AI Service</text>
+
+  <rect class="lane" x="1390" y="140" width="440" height="1370"/>
+  <text class="laneTitle" x="1610" y="180" text-anchor="middle">External Services</text>
+
+  <!-- Frontend -->
+  <rect class="box frontend" x="110" y="245" width="230" height="92"/>
+  <text class="label" x="225" y="280" text-anchor="middle">User Uploads File</text>
+  <text class="text" x="225" y="306" text-anchor="middle">audio, video, PDF, DOCX</text>
+
+  <rect class="box frontend" x="110" y="1365" width="230" height="92"/>
+  <text class="label" x="225" y="1400" text-anchor="middle">Display Results</text>
+  <text class="text" x="225" y="1426" text-anchor="middle">summary, transcript, tasks</text>
+
+  <!-- PHP -->
+  <rect class="box php" x="490" y="245" width="230" height="92"/>
+  <text class="label" x="605" y="280" text-anchor="middle">Receive Upload</text>
+  <text class="text" x="605" y="306" text-anchor="middle">multipart from frontend</text>
+
+  <rect class="box php" x="490" y="390" width="230" height="92"/>
+  <text class="label" x="605" y="425" text-anchor="middle">Validate Access</text>
+  <text class="text" x="605" y="451" text-anchor="middle">user + project scope</text>
+
+  <rect class="box php" x="490" y="535" width="230" height="92"/>
+  <text class="label" x="605" y="570" text-anchor="middle">Store File</text>
+  <text class="text" x="605" y="596" text-anchor="middle">path or internal URL</text>
+
+  <rect class="box db" x="490" y="680" width="230" height="92"/>
+  <text class="label" x="605" y="715" text-anchor="middle">Create Upload Record</text>
+  <text class="text" x="605" y="741" text-anchor="middle">upload_id, project_id</text>
+
+  <rect class="box php" x="470" y="825" width="270" height="116"/>
+  <text class="label" x="605" y="861" text-anchor="middle">Call AI Service</text>
+  <text class="text" x="605" y="888" text-anchor="middle">POST /api/v1/uploads/process</text>
+  <text class="tiny" x="605" y="914" text-anchor="middle">file_path or file_url</text>
+
+  <rect class="box db" x="490" y="1220" width="230" height="100"/>
+  <text class="label" x="605" y="1255" text-anchor="middle">Save AI Results</text>
+  <text class="text" x="605" y="1281" text-anchor="middle">transcript, summary,</text>
+  <text class="text" x="605" y="1304" text-anchor="middle">decisions, tasks</text>
+
+  <!-- AI service top -->
+  <polygon class="decision" points="1085,245 1250,325 1085,405 920,325"/>
+  <text class="label" x="1085" y="320" text-anchor="middle">Source Type?</text>
+  <text class="tiny" x="1085" y="346" text-anchor="middle">text, document, media</text>
+
+  <!-- Text branch -->
+  <rect class="box ai" x="870" y="505" width="260" height="92"/>
+  <text class="label" x="1000" y="540" text-anchor="middle">Extract Text</text>
+  <text class="text" x="1000" y="566" text-anchor="middle">Text / PDF / DOCX</text>
+
+  <!-- Media branch -->
+  <rect class="box ai" x="1170" y="505" width="260" height="92"/>
+  <text class="label" x="1300" y="540" text-anchor="middle">Extract Audio</text>
+  <text class="text" x="1300" y="566" text-anchor="middle">ffmpeg / imageio-ffmpeg</text>
+
+  <rect class="box ai" x="1170" y="650" width="260" height="92"/>
+  <text class="label" x="1300" y="685" text-anchor="middle">Split Audio</text>
+  <text class="text" x="1300" y="711" text-anchor="middle">chunked MP3 segments</text>
+
+  <rect class="box external" x="1480" y="650" width="260" height="92"/>
+  <text class="label" x="1610" y="685" text-anchor="middle">Groq Whisper</text>
+  <text class="text" x="1610" y="711" text-anchor="middle">audio to text</text>
+
+  <!-- Common transcript -->
+  <rect class="box ai" x="955" y="830" width="260" height="92"/>
+  <text class="label" x="1085" y="865" text-anchor="middle">Transcript</text>
+  <text class="text" x="1085" y="891" text-anchor="middle">full extracted text</text>
+
+  <!-- Analysis -->
+  <rect class="box external" x="1480" y="830" width="260" height="92"/>
+  <text class="label" x="1610" y="865" text-anchor="middle">Groq LLM</text>
+  <text class="text" x="1610" y="891" text-anchor="middle">analyze transcript</text>
+
+  <rect class="box ai" x="870" y="1010" width="210" height="86"/>
+  <text class="label" x="975" y="1043" text-anchor="middle">Summary</text>
+  <text class="text" x="975" y="1069" text-anchor="middle">meeting overview</text>
+
+  <rect class="box ai" x="1115" y="1010" width="210" height="86"/>
+  <text class="label" x="1220" y="1043" text-anchor="middle">Decisions</text>
+  <text class="text" x="1220" y="1069" text-anchor="middle">key decisions</text>
+
+  <rect class="box ai" x="870" y="1135" width="210" height="86"/>
+  <text class="label" x="975" y="1168" text-anchor="middle">Tasks</text>
+  <text class="text" x="975" y="1194" text-anchor="middle">action items</text>
+
+  <rect class="box ai" x="1115" y="1135" width="210" height="86"/>
+  <text class="label" x="1220" y="1168" text-anchor="middle">Text Chunks</text>
+  <text class="text" x="1220" y="1194" text-anchor="middle">for RAG/search</text>
+
+  <rect class="box ai" x="1115" y="1260" width="210" height="86"/>
+  <text class="label" x="1220" y="1293" text-anchor="middle">Embeddings</text>
+  <text class="text" x="1220" y="1319" text-anchor="middle">prepared vectors</text>
+
+  <rect class="box external" x="1480" y="1260" width="260" height="86"/>
+  <text class="label" x="1610" y="1293" text-anchor="middle">Pinecone</text>
+  <text class="text" x="1610" y="1319" text-anchor="middle">optional index hook</text>
+
+  <rect class="box result" x="920" y="1410" width="330" height="92"/>
+  <text class="label" x="1085" y="1445" text-anchor="middle">AI Service Returns JSON</text>
+  <text class="text" x="1085" y="1471" text-anchor="middle">transcript, summary, tasks, chunks</text>
+
+  <!-- Notes -->
+  <rect class="note" x="1428" y="245" width="365" height="125"/>
+  <text class="label" x="1610" y="282" text-anchor="middle">Important</text>
+  <text class="text" x="1610" y="313" text-anchor="middle">Frontend never calls AI Service directly.</text>
+  <text class="text" x="1610" y="340" text-anchor="middle">PHP owns DB writes and permissions.</text>
+
+  <rect class="note" x="1428" y="1035" width="365" height="110"/>
+  <text class="label" x="1610" y="1072" text-anchor="middle">Output Saved by PHP</text>
+  <text class="text" x="1610" y="1103" text-anchor="middle">persisted=false from AI Service is expected.</text>
+
+  <!-- Edges: frontend/php vertical -->
+  <path class="edge" d="M 340 291 H 490"/>
+  <path class="edge" d="M 605 337 V 390"/>
+  <path class="edge" d="M 605 482 V 535"/>
+  <path class="edge" d="M 605 627 V 680"/>
+  <path class="edge" d="M 605 772 V 825"/>
+
+  <!-- PHP to AI -->
+  <path class="edge" d="M 740 883 H 820 V 325 H 920"/>
+
+  <!-- Source type split -->
+  <path class="edge" d="M 1030 390 V 505"/>
+  <text class="tiny" x="938" y="470">Text / PDF / DOCX</text>
+
+  <path class="edge" d="M 1155 390 V 465 H 1300 V 505"/>
+  <text class="tiny" x="1288" y="470">Audio / Video</text>
+
+  <!-- Text to transcript -->
+  <path class="edgeLight" d="M 1000 597 V 830"/>
+
+  <!-- Media path -->
+  <path class="edge" d="M 1300 597 V 650"/>
+  <path class="edge" d="M 1430 696 H 1480"/>
+  <path class="edge" d="M 1480 742 H 1355 V 790 H 1125 V 830"/>
+
+  <!-- Transcript to LLM and chunks -->
+  <path class="edge" d="M 1215 876 H 1480"/>
+  <path class="edge" d="M 1610 922 V 970 H 975 V 1010"/>
+  <path class="edge" d="M 1610 922 V 970 H 1220 V 1010"/>
+  <path class="edge" d="M 1610 922 V 1110 H 975 V 1135"/>
+
+  <path class="edgeLight" d="M 1085 922 V 960 H 1220 V 1135"/>
+  <path class="edgeLight" d="M 1220 1221 V 1260"/>
+  <path class="dash" d="M 1325 1303 H 1480"/>
+
+  <!-- Outputs to JSON -->
+  <path class="edgeLight" d="M 975 1096 V 1370 H 1085 V 1410"/>
+  <path class="edgeLight" d="M 1220 1096 V 1370 H 1085 V 1410"/>
+  <path class="edgeLight" d="M 975 1221 V 1370 H 1085 V 1410"/>
+  <path class="edgeLight" d="M 1220 1346 V 1370 H 1085 V 1410"/>
+
+  <!-- AI result back to PHP/frontend -->
+  <path class="edge" d="M 920 1456 H 780 V 1270 H 720"/>
+  <path class="edge" d="M 490 1270 H 420 V 1411 H 340"/>
+
+  <!-- File storage dashed relation -->
+  <path class="dash" d="M 720 581 H 1390"/>
+  <text class="tiny" x="1055" y="560" text-anchor="middle">file_path or file_url</text>
+
+  <!-- Footer legend -->
+  <text class="tiny" x="950" y="1640" text-anchor="middle">Ready endpoint: POST /api/v1/uploads/process | PHP sends upload_id, project_id, and file_path/file_url | AI returns transcript, summary, decisions, tasks, chunks</text>
+</svg>

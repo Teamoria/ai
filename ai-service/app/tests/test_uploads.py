@@ -1,7 +1,10 @@
 """Upload processing tests."""
 
+import time
+
 from fastapi.testclient import TestClient
 
+from app.core import database
 from app.core.config import settings
 from app.main import app
 
@@ -79,3 +82,59 @@ def test_process_media_upload_requires_groq_api_key(tmp_path, monkeypatch) -> No
 
     assert response.status_code == 503
     assert "GROQ_API_KEY" in response.json()["detail"]
+
+
+def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "database_url", f"sqlite:///{tmp_path / 'uploads.db'}")
+    monkeypatch.setattr(settings, "upload_temp_dir", str(tmp_path / "storage"))
+    monkeypatch.setattr(settings, "groq_api_key", "")
+    database.engine = None
+    database.SessionLocal = None
+
+    response = client.post(
+        "/api/v1/uploads",
+        headers={
+            **auth_headers(),
+            "X-User-Id": "user-1",
+            "X-User-Role": "admin",
+        },
+        data={
+            "scope": "personal",
+            "visibility": "private",
+        },
+        files=[
+            (
+                "files",
+                (
+                    "meeting.txt",
+                    b"The team decided to connect uploads. Ahmad will verify the frontend response.",
+                    "text/plain",
+                ),
+            ),
+        ],
+    )
+
+    assert response.status_code == 200
+    upload = response.json()["data"]["uploads"][0]
+    assert upload["processing_status"] == "queued"
+
+    detail_response = None
+    detail = None
+    for _ in range(20):
+        detail_response = client.get(
+            f"/api/v1/uploads/{upload['id']}",
+            headers=auth_headers(),
+        )
+        assert detail_response.status_code == 200
+        detail = detail_response.json()["data"]["upload"]
+        if detail["processing_status"] == "processed":
+            break
+        time.sleep(0.05)
+
+    assert detail_response is not None
+    assert detail is not None
+    assert detail_response.status_code == 200
+    assert detail["processing_status"] == "processed"
+    assert detail["summary"]["summary"]
+    assert detail["decisions"][0]["decision_text"] == "The team decided to connect uploads."
+    assert detail["chunks_count"] >= 1
