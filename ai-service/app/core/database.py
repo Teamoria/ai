@@ -21,7 +21,7 @@ def get_engine() -> Engine:
     global engine
 
     if engine is None:
-        engine = create_engine(settings.database_url, pool_pre_ping=True)
+        engine = create_engine(settings.database_url, pool_pre_ping=True, pool_recycle=280)
 
     return engine
 
