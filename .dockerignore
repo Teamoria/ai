@@ -1,0 +1,68 @@
+# Git
+.git
+.github
+.gitignore
+
+# Python caches
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Virtual environments
+.venv
+venv
+ENV
+
+# Environment files (secrets — injected at runtime)
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+dist
+build
+tmp
+
+# Media files
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.webm
+*.mov
+*.avi
+*.mkv
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Docs (not needed in image)
+*.md
+*.txt
+demo-script.md
+ai-algorithms-diagrams.md
+ai-service-api.md
+ai-service-flow.md
+PROJECT_FILES_SUMMARY.md
+AI_SERVICE_BACKEND_API_CONTRACT.md
+
+# Postman collections
+ai-service/.postman
+ai-service/postman
