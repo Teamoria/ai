@@ -76,6 +76,7 @@ jobs:
 
       - name: Run tests
         env:
+          PYTHONPATH: .
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/teamoria_ai_test
           INTERNAL_API_KEY: test-key
           LLM_PROVIDER: groq
