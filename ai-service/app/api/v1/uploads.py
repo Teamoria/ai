@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from app.api.deps import validate_internal_api_key
 from app.schemas.upload import ProcessUploadRequest, ProcessUploadResponse, UploadActor, UploadResponse
 from app.services.process_upload_job import ProcessUploadJob
-from app.services.upload_management_service import UploadManagementService, upload_to_summary
+from app.services.upload_management_service import UploadManagementService, upload_processing_state, upload_to_summary
 from app.services.upload_processor import UploadProcessor
 
 
@@ -53,6 +53,7 @@ async def upload_files(
     shared_with_user_ids = form.getlist("shared_with_user_ids") + form.getlist("shared_with_user_ids[]")
     service = UploadManagementService()
     created = []
+    reused_count = 0
     upload_files = form.getlist("files") + form.getlist("files[]")
 
     if not upload_files:
@@ -77,13 +78,24 @@ async def upload_files(
                 shared_with_user_ids=_parse_shared_user_ids(shared_with_user_ids),
                 access_level=access_level,
             )
-            created.append(upload_to_summary(stored.upload).model_dump())
-            Thread(target=ProcessUploadJob(stored.upload.id).run, daemon=True).start()
+            upload_payload = upload_to_summary(stored.upload).model_dump()
+            upload_payload["already_exists"] = not stored.created
+            upload_payload["has_ai_analysis"] = stored.upload.processing_status == "processed"
+            if not stored.created:
+                reused_count += 1
+                upload_payload["message"] = (
+                    "This file already exists and its AI analysis is ready."
+                    if stored.upload.processing_status == "processed"
+                    else "This file already exists and AI processing is already in progress."
+                )
+            created.append(upload_payload)
+            if stored.created:
+                Thread(target=ProcessUploadJob(stored.upload.id).run, daemon=True).start()
     finally:
         service.session.close()
 
     return UploadResponse(
-        message="Files uploaded successfully",
+        message="Existing processed file returned" if reused_count == len(created) else "Files uploaded successfully",
         data={"uploads": created},
     )
 
@@ -198,13 +210,17 @@ def upload_meeting() -> dict[str, str]:
 
 
 @router.get("/uploads/{upload_id}/status", dependencies=[Depends(validate_internal_api_key)])
-def get_upload_status(upload_id: str, actor: UploadActor = Depends(current_actor)) -> dict[str, str | None]:
+def get_upload_status(upload_id: str, actor: UploadActor = Depends(current_actor)) -> dict[str, str | int | None]:
     service = UploadManagementService()
     try:
         upload = service.get_upload(upload_id, actor=actor)
+        state = upload_processing_state(upload)
         return {
             "upload_id": upload.id,
             "status": upload.processing_status,
+            "stage": state["stage"],
+            "progress": state["progress"],
+            "message": state["message"],
             "processing_error": upload.processing_error,
         }
     finally:

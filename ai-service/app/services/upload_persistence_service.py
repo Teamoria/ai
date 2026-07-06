@@ -16,6 +16,9 @@ class UploadPersistenceService:
         summary: str,
         decisions: list[str],
         tasks: list[str],
+        structured_summary: dict | None = None,
+        decision_items: list[dict] | None = None,
+        task_items: list[dict] | None = None,
     ) -> bool:
         try:
             session = get_session()

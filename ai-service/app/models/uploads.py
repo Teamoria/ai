@@ -26,12 +26,14 @@ class Upload(Base):
     file_path: Mapped[str] = mapped_column(String(255))
     file_name: Mapped[str] = mapped_column(String(255))
     file_type: Mapped[str] = mapped_column(String(255))
+    content_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     category: Mapped[str] = mapped_column(String(32))
     file_size: Mapped[int] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(32), default="success")
     upload_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     processing_status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    processing_stage: Mapped[str | None] = mapped_column(String(32), nullable=True)
     processing_error: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

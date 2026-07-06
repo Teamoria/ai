@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_llm_model: str = "llama-3.3-70b-versatile"
     groq_transcription_model: str = "whisper-large-v3-turbo"
+    groq_transcription_language: str = ""
+    groq_transcription_prompt: str = (
+        "The audio may contain Arabic, English, or mixed Arabic-English project-management discussion. "
+        "Transcribe names and technical terms clearly. Do not translate; preserve the spoken language."
+    )
     groq_verify_ssl: bool = True
     groq_request_timeout: float = 90.0
     ffmpeg_path: str = "ffmpeg"

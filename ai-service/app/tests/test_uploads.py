@@ -42,12 +42,13 @@ def test_process_upload_returns_laravel_ready_ai_payload(monkeypatch) -> None:
     assert payload["upload_id"] == "upload-1"
     assert payload["project_id"] == "project-1"
     assert payload["source_type"] == "text"
-    assert "Key decision: The team decided to connect Laravel uploads to FastAPI." in payload["summary"]
-    assert "Next action: Ahmad will prepare the frontend demo." in payload["summary"]
+    assert payload["structured_summary"]["overview"]
     assert payload["decisions"] == [
         "The team decided to connect Laravel uploads to FastAPI.",
     ]
-    assert payload["tasks"] == ["Ahmad will prepare the frontend demo."]
+    assert payload["decision_items"][0]["title"] == "The team decided to connect Laravel uploads to FastAPI"
+    assert payload["tasks"] == ["Ahmad will prepare the frontend demo"]
+    assert payload["task_items"][0]["title"] == "Ahmad will prepare the frontend demo"
     assert payload["chunks"][0]["content"]
     assert payload["chunks"][0]["embedding"]
     assert payload["chunks"][0]["metadata"]["source"] == "content"
@@ -107,6 +108,8 @@ def test_meeting_intelligence_extracts_arabic_tasks_section(monkeypatch) -> None
         "تطوير خدمة تخزين الملفات",
         "عرض قائمة المهام القابلة للتعديل",
     ]
+    assert result["task_items"][0]["category"] == "Backend"
+    assert result["task_items"][2]["category"] == "Frontend"
 
 
 def test_clean_extracted_text_repairs_arabic_mojibake() -> None:
@@ -167,9 +170,13 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
     assert response.status_code == 200
     upload = response.json()["data"]["uploads"][0]
     assert upload["processing_status"] == "queued"
+    assert upload["processing_stage"] == "queued"
+    assert upload["processing_progress"] == 10
+    assert "File uploaded" in upload["processing_message"]
 
     detail_response = None
     detail = None
+    status_payload = None
     for _ in range(20):
         detail_response = client.get(
             f"/api/v1/uploads/{upload['id']}",
@@ -177,6 +184,12 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
         )
         assert detail_response.status_code == 200
         detail = detail_response.json()["data"]["upload"]
+        status_response = client.get(
+            f"/api/v1/uploads/{upload['id']}/status",
+            headers=auth_headers(),
+        )
+        assert status_response.status_code == 200
+        status_payload = status_response.json()
         if detail["processing_status"] == "processed":
             break
         time.sleep(0.05)
@@ -185,6 +198,43 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
     assert detail is not None
     assert detail_response.status_code == 200
     assert detail["processing_status"] == "processed"
+    assert detail["processing_stage"] == "processed"
+    assert detail["processing_progress"] == 100
+    assert status_payload is not None
+    assert status_payload["stage"] == "processed"
+    assert status_payload["progress"] == 100
     assert detail["summary"]["summary"]
     assert detail["decisions"][0]["decision_text"] == "The team decided to connect uploads."
     assert detail["chunks_count"] >= 1
+
+    duplicate_response = client.post(
+        "/api/v1/uploads",
+        headers={
+            **auth_headers(),
+            "X-User-Id": "user-1",
+            "X-User-Role": "admin",
+        },
+        data={
+            "scope": "personal",
+            "visibility": "private",
+        },
+        files=[
+            (
+                "files",
+                (
+                    "meeting.txt",
+                    b"The team decided to connect uploads. Ahmad will verify the frontend response.",
+                    "text/plain",
+                ),
+            ),
+        ],
+    )
+
+    assert duplicate_response.status_code == 200
+    assert duplicate_response.json()["message"] == "Existing processed file returned"
+    duplicate_upload = duplicate_response.json()["data"]["uploads"][0]
+    assert duplicate_upload["id"] == upload["id"]
+    assert duplicate_upload["processing_status"] == "processed"
+    assert duplicate_upload["already_exists"] is True
+    assert duplicate_upload["has_ai_analysis"] is True
+    assert "already exists" in duplicate_upload["message"]

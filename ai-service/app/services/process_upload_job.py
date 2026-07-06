@@ -34,8 +34,10 @@ class ProcessUploadJob:
                     project_id=project_id,
                     file_path=file_path,
                 ),
+                progress_callback=lambda status_value: _mark_status(upload_id, status_value),
             )
 
+            _mark_status(upload_id, "saving")
             save_service = UploadManagementService()
             fresh_upload = save_service.get_upload(upload_id, actor=_system_actor(), require_manage=True)
             save_service.save_processing_result(
@@ -45,6 +47,9 @@ class ProcessUploadJob:
                 summary=result.summary,
                 decisions=result.decisions,
                 tasks=result.tasks,
+                structured_summary=result.structured_summary.model_dump() if result.structured_summary else None,
+                decision_items=[item.model_dump() for item in result.decision_items],
+                task_items=[item.model_dump() for item in result.task_items],
                 chunks=[chunk.model_dump() for chunk in result.chunks],
             )
             save_service.session.close()
@@ -67,5 +72,13 @@ def _mark_failed(upload_id: str, error: str) -> None:
     try:
         service.session.rollback()
         service.set_status(upload_id, "failed", error)
+    finally:
+        service.session.close()
+
+
+def _mark_status(upload_id: str, status_value: str) -> None:
+    service = UploadManagementService()
+    try:
+        service.set_status(upload_id, status_value)
     finally:
         service.session.close()

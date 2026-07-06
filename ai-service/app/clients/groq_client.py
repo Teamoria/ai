@@ -34,11 +34,16 @@ class GroqWhisperClient:
 
         try:
             with audio_path.open("rb") as audio_file:
-                result = client.audio.transcriptions.create(
-                    file=(audio_path.name, audio_file.read()),
-                    model=settings.groq_transcription_model,
-                    response_format="text",
-                )
+                payload: dict[str, Any] = {
+                    "file": (audio_path.name, audio_file.read()),
+                    "model": settings.groq_transcription_model,
+                    "response_format": "text",
+                }
+                if settings.groq_transcription_language:
+                    payload["language"] = settings.groq_transcription_language
+                if settings.groq_transcription_prompt:
+                    payload["prompt"] = settings.groq_transcription_prompt
+                result = client.audio.transcriptions.create(**payload)
         except Exception as exc:  # pragma: no cover - provider/network dependent
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,

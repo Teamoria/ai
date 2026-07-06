@@ -1,5 +1,7 @@
 """Meeting and file upload processing service."""
 
+from collections.abc import Callable
+
 from app.schemas.upload import KnowledgeChunkResponse, ProcessUploadRequest, ProcessUploadResponse
 from app.services.embedding_service import EmbeddingService
 from app.services.media_transcription_service import MediaTranscriptionService
@@ -25,7 +27,17 @@ class UploadProcessor:
         self.pinecone_service = pinecone_service or PineconeService()
         self.persistence_service = persistence_service or UploadPersistenceService()
 
-    def process(self, request: ProcessUploadRequest) -> ProcessUploadResponse:
+    def process(
+        self,
+        request: ProcessUploadRequest,
+        *,
+        progress_callback: Callable[[str], None] | None = None,
+    ) -> ProcessUploadResponse:
+        def report(status_value: str) -> None:
+            if progress_callback is not None:
+                progress_callback(status_value)
+
+        report("extracting")
         source = resolve_upload_source(
             content=request.content,
             file_path=request.file_path,
@@ -35,14 +47,21 @@ class UploadProcessor:
         if source.source_type == "media":
             if source.path is None:
                 raise ValueError("Media source is missing its path.")
+            report("transcribing")
             transcript = clean_extracted_text(self.media_transcription_service.transcribe(source.path))
         else:
             transcript = clean_extracted_text(source.text or "")
 
+        report("analyzing")
         analysis = self.meeting_intelligence_service.analyze(transcript)
         summary = str(analysis["summary"])
+        transcript_quality = analysis.get("transcript_quality")
         decisions = list(analysis["decisions"])
         tasks = list(analysis["tasks"])
+        structured_summary = analysis.get("structured_summary")
+        decision_items = list(analysis.get("decision_items") or [])
+        task_items = list(analysis.get("task_items") or [])
+        report("chunking")
         chunks = [
             KnowledgeChunkResponse(
                 content=chunk,
@@ -56,11 +75,13 @@ class UploadProcessor:
             for index, chunk in enumerate(chunk_text(transcript))
         ]
         chunk_payloads = [chunk.model_dump() for chunk in chunks]
+        report("indexing")
         indexed_chunk_count = self.pinecone_service.index_upload_chunks(
             upload_id=request.upload_id,
             project_id=request.project_id,
             chunks=chunk_payloads,
         )
+        report("saving")
         persisted = self.persistence_service.save_processing_result(
             upload_id=request.upload_id,
             project_id=request.project_id,
@@ -69,6 +90,9 @@ class UploadProcessor:
             summary=summary,
             decisions=decisions,
             tasks=tasks,
+            structured_summary=structured_summary if isinstance(structured_summary, dict) else None,
+            decision_items=decision_items,
+            task_items=task_items,
         )
 
         return ProcessUploadResponse(
@@ -76,9 +100,13 @@ class UploadProcessor:
             project_id=request.project_id,
             source_type=source.source_type,
             transcript=transcript,
+            transcript_quality=transcript_quality if isinstance(transcript_quality, dict) else None,
             summary=summary,
+            structured_summary=structured_summary if isinstance(structured_summary, dict) else None,
             decisions=decisions,
+            decision_items=decision_items,
             tasks=tasks,
+            task_items=task_items,
             chunks=chunks,
             indexed_chunk_count=indexed_chunk_count,
             persisted=persisted,
