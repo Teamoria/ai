@@ -22,8 +22,12 @@ class PineconeService:
         except ImportError:
             return 0
 
-        pc = Pinecone(api_key=settings.pinecone_api_key)
-        index = pc.Index(host=settings.pinecone_host) if settings.pinecone_host else pc.Index(index_name)
+        try:
+            pc = Pinecone(api_key=settings.pinecone_api_key)
+            index = pc.Index(host=settings.pinecone_host) if settings.pinecone_host else pc.Index(index_name)
+        except Exception:
+            return 0
+
         namespace = settings.pinecone_namespace or f"{settings.pinecone_namespace_prefix}-{project_id or 'global'}"
         dimension = _resolve_index_dimension(pc, index_name)
 

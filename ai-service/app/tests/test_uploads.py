@@ -67,6 +67,27 @@ def test_process_upload_requires_internal_api_key() -> None:
     assert response.status_code == 401
 
 
+def test_process_upload_ignores_unavailable_pinecone(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+    monkeypatch.setattr(settings, "pinecone_api_key", "pinecone-key")
+    monkeypatch.setattr(settings, "pinecone_index_name", "missing-index")
+    monkeypatch.setattr(settings, "pinecone_index", "")
+    monkeypatch.setattr(settings, "pinecone_host", "")
+
+    response = client.post(
+        "/api/v1/uploads/process",
+        headers=auth_headers(),
+        json={
+            "upload_id": "upload-1",
+            "project_id": "project-1",
+            "content": "The team decided to connect uploads.",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["indexed_chunk_count"] == 0
+
+
 def test_meeting_intelligence_extracts_arabic_tasks_section(monkeypatch) -> None:
     monkeypatch.setattr(settings, "groq_api_key", "")
 
