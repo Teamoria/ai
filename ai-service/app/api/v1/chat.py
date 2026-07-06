@@ -15,6 +15,11 @@ def create_chat_response(request: ChatRequest) -> ChatResponse:
     return ChatService().answer(request)
 
 
+@router.post("/ai/conversations", response_model=ChatResponse, dependencies=[Depends(validate_internal_api_key)])
+def create_ai_conversation(request: ChatRequest) -> ChatResponse:
+    return ChatService().answer(request)
+
+
 @router.get("/chat/sessions", dependencies=[Depends(validate_internal_api_key)])
 def list_chat_sessions() -> dict[str, str]:
     return {"status": "stateless"}

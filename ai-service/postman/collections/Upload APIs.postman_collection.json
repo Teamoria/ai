@@ -1,0 +1,403 @@
+{
+    "info":  {
+                 "_postman_id":  "94d7c1b7-0c23-4f8d-ae37-5d3f0e31e1db",
+                 "name":  "Upload APIs",
+                 "description":  "Teamoria AI Service endpoints for backend integration. Set `internal_api_key` to the same value as `INTERNAL_API_KEY` in `ai-service/.env`.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "variable":  [
+                     {
+                         "key":  "base_url",
+                         "value":  "http://127.0.0.1:8001"
+                     },
+                     {
+                         "key":  "api_prefix",
+                         "value":  "/api/v1"
+                     },
+                     {
+                         "key":  "internal_api_key",
+                         "value":  "change_me",
+                         "type":  "secret"
+                     },
+                     {
+                         "key":  "project_id",
+                         "value":  "project-1"
+                     },
+                     {
+                         "key":  "upload_id",
+                         "value":  "upload-1"
+                     },
+                     {
+                         "key":  "user_id",
+                         "value":  "system"
+                     },
+                     {
+                         "key":  "user_role",
+                         "value":  "admin"
+                     }
+                 ],
+    "auth":  {
+                 "type":  "apikey",
+                 "apikey":  [
+                                {
+                                    "key":  "key",
+                                    "value":  "X-Internal-API-Key",
+                                    "type":  "string"
+                                },
+                                {
+                                    "key":  "value",
+                                    "value":  "{{internal_api_key}}",
+                                    "type":  "string"
+                                },
+                                {
+                                    "key":  "in",
+                                    "value":  "header",
+                                    "type":  "string"
+                                }
+                            ]
+             },
+    "event":  [
+                  {
+                      "listen":  "prerequest",
+                      "script":  {
+                                     "type":  "text/javascript",
+                                     "exec":  [
+                                                  "pm.request.headers.upsert({ key: \u0027X-Internal-API-Key\u0027, value: pm.variables.get(\u0027internal_api_key\u0027) || \u0027\u0027 });",
+                                                  "pm.request.headers.upsert({ key: \u0027X-User-Id\u0027, value: pm.variables.get(\u0027user_id\u0027) || \u0027system\u0027 });",
+                                                  "pm.request.headers.upsert({ key: \u0027X-User-Role\u0027, value: pm.variables.get(\u0027user_role\u0027) || \u0027admin\u0027 });"
+                                              ]
+                                 }
+                  }
+              ],
+    "item":  [
+                 {
+                     "name":  "Health Check",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}/health",
+                                                 "host":  [
+                                                              "{{base_url}}"
+                                                          ],
+                                                 "path":  [
+                                                              "health"
+                                                          ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Upload Files",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+
+                                                ],
+                                     "body":  {
+                                                  "mode":  "formdata",
+                                                  "formdata":  [
+                                                                   {
+                                                                       "key":  "files",
+                                                                       "type":  "file",
+                                                                       "src":  [
+
+                                                                               ]
+                                                                   },
+                                                                   {
+                                                                       "key":  "scope",
+                                                                       "value":  "project",
+                                                                       "type":  "text"
+                                                                   },
+                                                                   {
+                                                                       "key":  "visibility",
+                                                                       "value":  "private",
+                                                                       "type":  "text"
+                                                                   },
+                                                                   {
+                                                                       "key":  "project_id",
+                                                                       "value":  "{{project_id}}",
+                                                                       "type":  "text"
+                                                                   },
+                                                                   {
+                                                                       "key":  "access_level",
+                                                                       "value":  "view",
+                                                                       "type":  "text"
+                                                                   }
+                                                               ]
+                                              },
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads"
+                                                          ]
+                                             },
+                                     "description":  "Upload one or more files. The AI service stores them and starts processing in the background."
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Process Upload - Direct Text",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "body":  {
+                                                  "mode":  "raw",
+                                                  "raw":  "{\n  \"upload_id\": \"{{upload_id}}\",\n  \"project_id\": \"{{project_id}}\",\n  \"content\": \"Today we reviewed the backend integration. The team decided to connect Laravel uploads to FastAPI. Ahmad will prepare the frontend demo tomorrow.\"\n}"
+                                              },
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads/process",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads",
+                                                              "process"
+                                                          ]
+                                             },
+                                     "description":  "Process direct text and return transcript, summary, decisions, tasks, and chunks."
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Process Upload - File Path",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "body":  {
+                                                  "mode":  "raw",
+                                                  "raw":  "{\n  \"upload_id\": \"{{upload_id}}\",\n  \"project_id\": \"{{project_id}}\",\n  \"file_path\": \"C:\\\\storage\\\\uploads\\\\meeting.mp4\"\n}"
+                                              },
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads/process",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads",
+                                                              "process"
+                                                          ]
+                                             },
+                                     "description":  "`file_path` must be readable from the machine or container running the AI service."
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "List Uploads",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads?project_id={{project_id}}\u0026per_page=50",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads"
+                                                          ],
+                                                 "query":  [
+                                                               {
+                                                                   "key":  "project_id",
+                                                                   "value":  "{{project_id}}"
+                                                               },
+                                                               {
+                                                                   "key":  "per_page",
+                                                                   "value":  "50"
+                                                               }
+                                                           ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Get Upload",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads/{{upload_id}}",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads",
+                                                              "{{upload_id}}"
+                                                          ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Get Upload Status",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads/{{upload_id}}/status",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads",
+                                                              "{{upload_id}}",
+                                                              "status"
+                                                          ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Download Upload",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads/{{upload_id}}/download",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads",
+                                                              "{{upload_id}}",
+                                                              "download"
+                                                          ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Delete Upload",
+                     "request":  {
+                                     "method":  "DELETE",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/uploads/{{upload_id}}",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "uploads",
+                                                              "{{upload_id}}"
+                                                          ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Chat",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ],
+                                     "body":  {
+                                                  "mode":  "raw",
+                                                  "raw":  "{\n  \"project_id\": \"{{project_id}}\",\n  \"question\": \"What did the team decide?\",\n  \"context\": [\n    \"The team decided to connect Laravel uploads to FastAPI.\"\n  ]\n}"
+                                              },
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/chat",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "chat"
+                                                          ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Chat Sessions",
+                     "request":  {
+                                     "method":  "GET",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/chat/sessions",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "chat",
+                                                              "sessions"
+                                                          ]
+                                             }
+                                 },
+                     "response":  [
+
+                                  ]
+                 },
+                 {
+                     "name":  "Deprecated Meeting Upload",
+                     "request":  {
+                                     "method":  "POST",
+                                     "header":  [
+
+                                                ],
+                                     "url":  {
+                                                 "raw":  "{{base_url}}{{api_prefix}}/meetings/upload",
+                                                 "host":  [
+                                                              "{{base_url}}{{api_prefix}}"
+                                                          ],
+                                                 "path":  [
+                                                              "meetings",
+                                                              "upload"
+                                                          ]
+                                             },
+                                     "description":  "Deprecated. Use `/uploads/process` instead."
+                                 },
+                     "response":  [
+
+                                  ]
+                 }
+             ]
+}

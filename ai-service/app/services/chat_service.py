@@ -1,12 +1,25 @@
 """Chat session and message service."""
 
+from app.core.database import get_session
 from app.schemas.chat import ChatRequest, ChatResponse, ChatSource
+from app.services.rag_service import RagService
 
 
 class ChatService:
     """Stateless project Q&A service."""
 
     def answer(self, request: ChatRequest) -> ChatResponse:
+        if request.user is not None:
+            with get_session() as session:
+                answer, sources = RagService(session).answer(request)
+
+            return ChatResponse(
+                project_id=request.project_id,
+                question=request.question or request.message or "",
+                answer=answer,
+                sources=sources,
+            )
+
         sources = [
             ChatSource(content=context, metadata={"rank": index + 1})
             for index, context in enumerate(request.context[:5])

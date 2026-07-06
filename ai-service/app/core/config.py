@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     media_chunk_seconds: int = 300
     upload_temp_dir: str = "tmp/uploads"
     openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
     pinecone_api_key: str = ""
     pinecone_index: str = ""
     pinecone_index_name: str = ""

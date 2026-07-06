@@ -45,3 +45,33 @@ def test_chat_is_stateless_without_context() -> None:
 
     assert response.status_code == 200
     assert "do not have project knowledge context" in response.json()["answer"]
+
+
+def test_ai_conversations_alias_uses_chat_service() -> None:
+    response = client.post(
+        "/api/v1/ai/conversations",
+        headers=auth_headers(),
+        json={
+            "project_id": "project-1",
+            "message": "What did the team decide?",
+            "context": ["The team decided to expose a conversations endpoint."],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "conversations endpoint" in response.json()["answer"]
+
+
+def test_root_ai_conversations_alias_uses_chat_service() -> None:
+    response = client.post(
+        "/ai/conversations",
+        headers=auth_headers(),
+        json={
+            "project_id": "project-1",
+            "message": "What did the team decide?",
+            "context": ["The root conversations endpoint is available."],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "root conversations endpoint" in response.json()["answer"]
