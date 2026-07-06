@@ -29,7 +29,7 @@ class GroqWhisperClient:
 
         client = Groq(
             api_key=settings.groq_api_key,
-            http_client=httpx.Client(verify=settings.groq_verify_ssl),
+            http_client=httpx.Client(verify=settings.groq_verify_ssl, timeout=settings.groq_request_timeout),
         )
 
         try:
@@ -68,7 +68,7 @@ class GroqLlmClient:
 
         client = Groq(
             api_key=settings.groq_api_key,
-            http_client=httpx.Client(verify=settings.groq_verify_ssl),
+            http_client=httpx.Client(verify=settings.groq_verify_ssl, timeout=settings.groq_request_timeout),
         )
 
         try:

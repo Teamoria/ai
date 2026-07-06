@@ -7,7 +7,7 @@ from app.services.meeting_intelligence_service import MeetingIntelligenceService
 from app.services.pinecone_service import PineconeService
 from app.services.upload_persistence_service import UploadPersistenceService
 from app.utils.chunking import chunk_text
-from app.utils.file_extractors import resolve_upload_source
+from app.utils.file_extractors import clean_extracted_text, resolve_upload_source
 
 
 class UploadProcessor:
@@ -35,9 +35,9 @@ class UploadProcessor:
         if source.source_type == "media":
             if source.path is None:
                 raise ValueError("Media source is missing its path.")
-            transcript = self.media_transcription_service.transcribe(source.path)
+            transcript = clean_extracted_text(self.media_transcription_service.transcribe(source.path))
         else:
-            transcript = source.text or ""
+            transcript = clean_extracted_text(source.text or "")
 
         analysis = self.meeting_intelligence_service.analyze(transcript)
         summary = str(analysis["summary"])
