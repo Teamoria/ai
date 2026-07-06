@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from app.core import database
 from app.core.config import settings
 from app.main import app
+from app.services.meeting_intelligence_service import MeetingIntelligenceService
+from app.utils.file_extractors import clean_extracted_text
 
 
 client = TestClient(app)
@@ -63,6 +65,33 @@ def test_process_upload_requires_internal_api_key() -> None:
     )
 
     assert response.status_code == 401
+
+
+def test_meeting_intelligence_extracts_arabic_tasks_section(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    transcript = """
+    المهام (Tasks)
+    مهام الواجهة الخلفية (Backend)
+    ● إنشاء واجهة برمجية لرفع ملفات الاجتماعات.
+    ● تطوير خدمة تخزين الملفات.
+    مهام الواجهة الأمامية (Frontend)
+    ● عرض قائمة المهام القابلة للتعديل.
+    """
+
+    result = MeetingIntelligenceService().analyze(transcript)
+
+    assert result["tasks"] == [
+        "إنشاء واجهة برمجية لرفع ملفات الاجتماعات",
+        "تطوير خدمة تخزين الملفات",
+        "عرض قائمة المهام القابلة للتعديل",
+    ]
+
+
+def test_clean_extracted_text_repairs_arabic_mojibake() -> None:
+    mojibake = "بس الدين Thank you".encode("utf-8").decode("latin1")
+
+    assert clean_extracted_text(mojibake) == "بس الدين Thank you"
 
 
 def test_process_media_upload_requires_groq_api_key(tmp_path, monkeypatch) -> None:
