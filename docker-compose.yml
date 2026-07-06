@@ -2,8 +2,8 @@
 # Teamoria AI Service — Docker Compose
 # ──────────────────────────────────────────────────
 # Usage:
-#   Development : docker compose up --build
-#   Production  : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Development : docker compose --env-file ai-service/.env up --build
+#   Production  : docker compose --env-file ai-service/.env --project-name teamoria-ai up -d --build
 # ──────────────────────────────────────────────────
 
 services:
@@ -15,8 +15,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: teamoria_ai
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -32,12 +30,14 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${PORT:-8000}:${PORT:-8000}"
+      # AI_SERVICE_PORT is loaded from ai-service/.env by --env-file.
+      # The service remains private to the server host.
+      - "127.0.0.1:${AI_SERVICE_PORT:-8000}:8000"
     env_file:
       - path: ai-service/.env
         required: false  # Copy .env.example → .env before deploying
     environment:
-      PORT: ${PORT:-8000}
+      PORT: 8000
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/teamoria_ai
     depends_on:
       db:

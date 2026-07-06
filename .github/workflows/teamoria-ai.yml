@@ -1,0 +1,254 @@
+# Teamoria AI Service — repository automation
+#
+# Required production environment secrets:
+#   SERVER_HOST, SERVER_SSH_PORT, SERVER_USERNAME, SERVER_SSH_KEY, PROJECT_PATH
+#
+# Required server file (kept outside Git):
+#   <PROJECT_PATH>/ai-service/.env (including AI_SERVICE_PORT)
+
+name: Teamoria AI — CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-service/**"
+      - "requirements.txt"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/teamoria-ai.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ai-service/**"
+      - "requirements.txt"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/teamoria-ai.yml"
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ── Repository automation ────────────────────────
+  auto-assign:
+    name: Assign new issues
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Assign issue
+        uses: pozil/auto-assign-issue@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          assignees: AhmedAl-Yazuri
+
+  # ── Continuous integration ──────────────────────
+  test:
+    name: Lint and test
+    if: github.event_name != 'issues'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-service
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: teamoria_ai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint with Ruff
+        run: ruff check app/ --output-format=github
+
+      - name: Run tests
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/teamoria_ai_test
+          INTERNAL_API_KEY: test-key
+          LLM_PROVIDER: groq
+          GROQ_API_KEY: test
+          OPENAI_API_KEY: test
+          PINECONE_API_KEY: test
+          PINECONE_INDEX_NAME: test
+        run: pytest app/tests/ -v --tb=short
+
+  # ── Container image ──────────────────────────────
+  build:
+    name: Build and publish image
+    needs: test
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Continuous deployment ───────────────────────
+  deploy:
+    name: Deploy to production
+    needs: build
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    concurrency:
+      group: production-ai-service
+      cancel-in-progress: false
+
+    env:
+      PROJECT_PATH: ${{ secrets.PROJECT_PATH }}
+      COMPOSE_PROJECT_NAME: teamoria-ai
+      DEPLOY_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Deploy Docker services over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: PROJECT_PATH,COMPOSE_PROJECT_NAME,DEPLOY_SHA
+          command_timeout: 20m
+          script_stop: true
+          script: |
+            set -eu
+
+            if [ -z "${PROJECT_PATH:-}" ]; then
+              echo "PROJECT_PATH secret is not configured."
+              exit 1
+            fi
+
+            cd "$PROJECT_PATH"
+
+            if [ ! -f ai-service/.env ]; then
+              echo "Missing $PROJECT_PATH/ai-service/.env on the server."
+              exit 1
+            fi
+
+            git fetch origin main
+
+            remote_sha="$(git rev-parse origin/main)"
+            if [ "$remote_sha" != "$DEPLOY_SHA" ]; then
+              echo "A newer main commit exists; skipping this outdated deployment."
+              exit 0
+            fi
+
+            git checkout main
+            git pull --ff-only origin main
+
+            compose() {
+              docker compose \
+                --env-file ai-service/.env \
+                --project-name "$COMPOSE_PROJECT_NAME" \
+                "$@"
+            }
+
+            compose config --quiet
+            compose up -d --build --remove-orphans
+
+            container_id="$(compose ps -q ai-service)"
+            if [ -z "$container_id" ]; then
+              echo "The ai-service container was not created."
+              compose ps
+              compose logs --tail=100 ai-service
+              exit 1
+            fi
+
+            attempt=1
+            while [ "$attempt" -le 36 ]; do
+              status="$(docker inspect \
+                --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+                "$container_id")"
+
+              if [ "$status" = "healthy" ]; then
+                echo "AI service deployed successfully and is healthy."
+                compose ps
+                exit 0
+              fi
+
+              if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+                echo "AI service failed with status: $status"
+                compose ps
+                compose logs --tail=100 ai-service
+                exit 1
+              fi
+
+              echo "Waiting for AI service health check ($attempt/36): $status"
+              attempt=$((attempt + 1))
+              sleep 5
+            done
+
+            echo "Timed out waiting for AI service health check."
+            compose ps
+            compose logs --tail=100 ai-service
+            exit 1
