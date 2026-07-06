@@ -149,8 +149,21 @@ class LaravelRepository:
             where = "u.project_id in :project_ids" if project_ids else "1 = 1"
         elif not user.company_id:
             return []
+        elif user.role == "company_owner":
+            where = "u.company_id = :company_id"
         else:
-            project_clause = "or (u.scope = 'project' and u.project_id in :project_ids)"
+            manager_project_clause = """
+                or (
+                    u.scope = 'project'
+                    and exists (
+                        select 1
+                        from project_user pu
+                        where pu.project_id = u.project_id
+                          and pu.user_id = :user_id
+                          and pu.role = 'manager'
+                    )
+                )
+            """
             task_clause = """
                 or (
                     u.scope = 'task'
@@ -181,14 +194,8 @@ class LaravelRepository:
                         where up.upload_id = u.id
                           and up.user_id = :user_id
                     )
-                    or (
-                        u.visibility = 'members'
-                        and (
-                            u.scope = 'company'
-                            {project_clause if project_ids else ""}
-                            {task_clause}
-                        )
-                    )
+                    {manager_project_clause}
+                    {task_clause}
                 )
             """
 
@@ -215,7 +222,7 @@ class LaravelRepository:
             """
         )
 
-        if project_ids and user.role != "admin":
+        if project_ids and user.role == "admin":
             query = query.bindparams(bindparam("project_ids", expanding=True))
             params["project_ids"] = project_ids
 

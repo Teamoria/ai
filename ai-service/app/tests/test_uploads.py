@@ -8,6 +8,7 @@ from app.core import database
 from app.core.config import settings
 from app.main import app
 from app.services.meeting_intelligence_service import MeetingIntelligenceService
+from app.services import upload_management_service
 from app.utils.file_extractors import clean_extracted_text
 
 
@@ -253,3 +254,49 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
         headers=auth_headers(),
     )
     assert missing_actor_response.status_code == 422
+
+
+def test_company_member_does_not_see_all_company_uploads(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "database_url", f"sqlite:///{tmp_path / 'company_uploads.db'}")
+    monkeypatch.setattr(settings, "upload_temp_dir", str(tmp_path / "storage"))
+    monkeypatch.setattr(settings, "groq_api_key", "")
+    database.engine = None
+    database.SessionLocal = None
+    upload_management_service._TABLES_READY = False
+
+    response = client.post(
+        "/api/v1/uploads",
+        headers=user_headers("user-2", "member", "company-1"),
+        data={
+            "scope": "company",
+            "visibility": "members",
+        },
+        files=[
+            (
+                "files",
+                (
+                    "company-plan.txt",
+                    b"Company-only planning notes.",
+                    "text/plain",
+                ),
+            ),
+        ],
+    )
+    assert response.status_code == 200
+    upload = response.json()["data"]["uploads"][0]
+
+    member_response = client.get(
+        "/api/v1/uploads?scope=company",
+        headers=user_headers("user-1", "member", "company-1"),
+    )
+    assert member_response.status_code == 200
+    member_upload_ids = [item["id"] for item in member_response.json()["data"]["uploads"]]
+    assert upload["id"] not in member_upload_ids
+
+    owner_response = client.get(
+        "/api/v1/uploads?scope=company",
+        headers=user_headers("owner-1", "company_owner", "company-1"),
+    )
+    assert owner_response.status_code == 200
+    owner_upload_ids = [item["id"] for item in owner_response.json()["data"]["uploads"]]
+    assert upload["id"] in owner_upload_ids

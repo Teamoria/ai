@@ -581,9 +581,9 @@ class UploadManagementService:
     def can_view(self, upload: Upload, actor: UploadActor) -> bool:
         if actor.role == "admin":
             return True
-        if upload.user_id == actor.user_id:
+        if actor.role == "company_owner" and upload.company_id and upload.company_id == actor.company_id:
             return True
-        if upload.visibility == "members" and upload.company_id and upload.company_id == actor.company_id:
+        if upload.user_id == actor.user_id:
             return True
         if upload.visibility == "selected":
             return self._has_permission(upload.id, actor.user_id)
@@ -591,6 +591,8 @@ class UploadManagementService:
 
     def can_manage(self, upload: Upload, actor: UploadActor) -> bool:
         if actor.role == "admin":
+            return True
+        if actor.role == "company_owner" and upload.company_id and upload.company_id == actor.company_id:
             return True
         if upload.user_id == actor.user_id:
             return True
