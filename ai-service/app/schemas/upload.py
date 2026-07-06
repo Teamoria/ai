@@ -71,7 +71,7 @@ class ProcessUploadResponse(BaseModel):
 
 class UploadActor(BaseModel):
     user_id: str = "system"
-    role: str = "admin"
+    role: str = "member"
     company_id: str | None = None
 
 

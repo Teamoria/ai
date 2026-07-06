@@ -17,8 +17,8 @@ router = APIRouter()
 
 
 def current_actor(
-    x_user_id: str = Header(default="system"),
-    x_user_role: str = Header(default="admin"),
+    x_user_id: str = Header(...),
+    x_user_role: str = Header(...),
     x_company_id: str | None = Header(default=None),
 ) -> UploadActor:
     return UploadActor(user_id=x_user_id, role=x_user_role, company_id=x_company_id)

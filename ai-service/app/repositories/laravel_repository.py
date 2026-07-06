@@ -87,9 +87,29 @@ class LaravelRepository:
         if not project_ids:
             return []
 
+        member_task_filter = ""
+        if user.role not in {"admin", "company_owner"}:
+            member_task_filter = """
+                  and (
+                    exists (
+                        select 1
+                        from task_user tu
+                        where tu.task_id = t.id
+                          and tu.user_id = :user_id
+                    )
+                    or exists (
+                        select 1
+                        from project_user pu
+                        where pu.project_id = t.project_id
+                          and pu.user_id = :user_id
+                          and pu.role = 'manager'
+                    )
+                  )
+            """
+
         rows = self.session.execute(
             text(
-                """
+                f"""
                 select
                     t.id,
                     t.project_id,
@@ -104,11 +124,12 @@ class LaravelRepository:
                 join projects p on p.id = t.project_id
                 where t.deleted_at is null
                   and t.project_id in :project_ids
+                  {member_task_filter}
                 order by t.updated_at desc
                 limit :limit
                 """
             ).bindparams(bindparam("project_ids", expanding=True)),
-            {"project_ids": project_ids, "limit": limit},
+            {"project_ids": project_ids, "limit": limit, "user_id": user.id},
         )
         return [dict(row._mapping) for row in rows]
 

@@ -18,6 +18,17 @@ def auth_headers() -> dict[str, str]:
     return {"X-Internal-API-Key": settings.internal_api_key}
 
 
+def user_headers(user_id: str = "user-1", role: str = "member", company_id: str | None = None) -> dict[str, str]:
+    headers = {
+        **auth_headers(),
+        "X-User-Id": user_id,
+        "X-User-Role": role,
+    }
+    if company_id:
+        headers["X-Company-Id"] = company_id
+    return headers
+
+
 def test_process_upload_returns_laravel_ready_ai_payload(monkeypatch) -> None:
     monkeypatch.setattr(settings, "groq_api_key", "")
 
@@ -146,11 +157,7 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
 
     response = client.post(
         "/api/v1/uploads",
-        headers={
-            **auth_headers(),
-            "X-User-Id": "user-1",
-            "X-User-Role": "admin",
-        },
+        headers=user_headers("user-1"),
         data={
             "scope": "personal",
             "visibility": "private",
@@ -180,13 +187,13 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
     for _ in range(20):
         detail_response = client.get(
             f"/api/v1/uploads/{upload['id']}",
-            headers=auth_headers(),
+            headers=user_headers("user-1"),
         )
         assert detail_response.status_code == 200
         detail = detail_response.json()["data"]["upload"]
         status_response = client.get(
             f"/api/v1/uploads/{upload['id']}/status",
-            headers=auth_headers(),
+            headers=user_headers("user-1"),
         )
         assert status_response.status_code == 200
         status_payload = status_response.json()
@@ -209,11 +216,7 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
 
     duplicate_response = client.post(
         "/api/v1/uploads",
-        headers={
-            **auth_headers(),
-            "X-User-Id": "user-1",
-            "X-User-Role": "admin",
-        },
+        headers=user_headers("user-1"),
         data={
             "scope": "personal",
             "visibility": "private",
@@ -238,3 +241,15 @@ def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch
     assert duplicate_upload["already_exists"] is True
     assert duplicate_upload["has_ai_analysis"] is True
     assert "already exists" in duplicate_upload["message"]
+
+    forbidden_response = client.get(
+        f"/api/v1/uploads/{upload['id']}",
+        headers=user_headers("user-2"),
+    )
+    assert forbidden_response.status_code == 403
+
+    missing_actor_response = client.get(
+        f"/api/v1/uploads/{upload['id']}",
+        headers=auth_headers(),
+    )
+    assert missing_actor_response.status_code == 422
