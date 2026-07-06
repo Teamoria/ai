@@ -3,8 +3,10 @@
 # ──────────────────────────────────────────────────
 # Usage:
 #   Development : docker compose --env-file ai-service/.env up --build
-#   Production  : docker compose --env-file ai-service/.env --project-name teamoria-ai up -d --build
+#   Production  : docker compose --env-file ai-service/.env up -d --build
 # ──────────────────────────────────────────────────
+
+name: teamoria-ai
 
 services:
   # ── PostgreSQL Database ──────────────────────────
@@ -32,7 +34,7 @@ services:
     ports:
       # AI_SERVICE_PORT is loaded from ai-service/.env by --env-file.
       # The service remains private to the server host.
-      - "127.0.0.1:${AI_SERVICE_PORT:-8000}:8000"
+      - "127.0.0.1:${AI_SERVICE_PORT:?Set AI_SERVICE_PORT in ai-service/.env and use --env-file ai-service/.env}:8000"
     env_file:
       - path: ai-service/.env
         required: false  # Copy .env.example → .env before deploying

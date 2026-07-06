@@ -166,7 +166,6 @@ jobs:
 
     env:
       PROJECT_PATH: ${{ secrets.PROJECT_PATH }}
-      COMPOSE_PROJECT_NAME: teamoria-ai
       DEPLOY_SHA: ${{ github.sha }}
 
     steps:
@@ -177,7 +176,7 @@ jobs:
           port: ${{ secrets.SERVER_SSH_PORT }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: PROJECT_PATH,COMPOSE_PROJECT_NAME,DEPLOY_SHA
+          envs: PROJECT_PATH,DEPLOY_SHA
           command_timeout: 20m
           script_stop: true
           script: |
@@ -209,7 +208,6 @@ jobs:
             compose() {
               docker compose \
                 --env-file ai-service/.env \
-                --project-name "$COMPOSE_PROJECT_NAME" \
                 "$@"
             }
 
