@@ -212,7 +212,9 @@ jobs:
             }
 
             compose config --quiet
-            compose up -d --build --remove-orphans
+            # Recreate only the application container so changes in
+            # ai-service/.env are injected without recreating PostgreSQL.
+            compose up -d --build --force-recreate --remove-orphans ai-service
 
             container_id="$(compose ps -q ai-service)"
             if [ -z "$container_id" ]; then
