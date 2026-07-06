@@ -44,6 +44,7 @@ def ensure_upload_tables() -> None:
 
         Base.metadata.create_all(bind=get_engine())
         _ensure_upload_processing_columns()
+        _ensure_meeting_intelligence_columns()
         _TABLES_READY = True
     except SQLAlchemyError as exc:
         raise HTTPException(
@@ -77,6 +78,44 @@ def _ensure_upload_processing_columns() -> None:
         for column_name, statement in required_columns.items():
             if column_name not in existing:
                 connection.execute(text(statement))
+
+
+def _ensure_meeting_intelligence_columns() -> None:
+    if get_engine().dialect.name != "mysql":
+        return
+
+    with get_engine().begin() as connection:
+        extracted_task_columns = {
+            row[0]
+            for row in connection.execute(
+                text(
+                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'extracted_tasks'"
+                ),
+            )
+        }
+
+        extracted_task_required_columns = {
+            "upload_id": "ALTER TABLE extracted_tasks ADD COLUMN upload_id VARCHAR(36) NULL AFTER id",
+            "status": "ALTER TABLE extracted_tasks ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'pending'",
+        }
+
+        for column_name, statement in extracted_task_required_columns.items():
+            if column_name not in extracted_task_columns:
+                connection.execute(text(statement))
+
+        extracted_task_indexes = {
+            row[0]
+            for row in connection.execute(
+                text(
+                    "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'extracted_tasks'"
+                ),
+            )
+        }
+
+        if "ix_extracted_tasks_upload_id" not in extracted_task_indexes:
+            connection.execute(text("CREATE INDEX ix_extracted_tasks_upload_id ON extracted_tasks (upload_id)"))
 
 
 def get_upload_session() -> Session:
