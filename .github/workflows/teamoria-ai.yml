@@ -224,24 +224,24 @@ jobs:
 
             attempt=1
             while [ "$attempt" -le 36 ]; do
-              status="$(docker inspect \
+              health_status="$(docker inspect \
                 --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
                 "$container_id")"
 
-              if [ "$status" = "healthy" ]; then
+              if [ "$health_status" = "healthy" ]; then
                 echo "AI service deployed successfully and is healthy."
                 compose ps
                 exit 0
               fi
 
-              if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
-                echo "AI service failed with status: $status"
+              if [ "$health_status" = "unhealthy" ] || [ "$health_status" = "exited" ] || [ "$health_status" = "dead" ]; then
+                echo "AI service failed with status: $health_status"
                 compose ps
                 compose logs --tail=100 ai-service
                 exit 1
               fi
 
-              echo "Waiting for AI service health check ($attempt/36): $status"
+              echo "Waiting for AI service health check ($attempt/36): $health_status"
               attempt=$((attempt + 1))
               sleep 5
             done
