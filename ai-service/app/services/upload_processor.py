@@ -30,6 +30,8 @@ class UploadProcessor:
         *,
         progress_callback: Callable[[str], None] | None = None,
     ) -> ProcessUploadResponse:
+        project_id = request.project_id or ""
+
         def report(status_value: str) -> None:
             if progress_callback is not None:
                 progress_callback(status_value)
@@ -78,14 +80,14 @@ class UploadProcessor:
         report("indexing")
         indexed_chunk_count = self.pinecone_service.index_upload_chunks(
             upload_id=request.upload_id,
-            project_id=request.project_id,
+            project_id=project_id,
             chunks=chunk_payloads,
         )
         report("saving")
 
         return ProcessUploadResponse(
             upload_id=request.upload_id,
-            project_id=request.project_id,
+            project_id=project_id,
             source_type=source.source_type,
             transcript=transcript,
             transcript_quality=transcript_quality if isinstance(transcript_quality, dict) else None,

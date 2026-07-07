@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class ProcessUploadRequest(BaseModel):
     upload_id: str
-    project_id: str
+    project_id: str | None = None
     file_path: str | None = None
     file_url: str | None = None
     file_url_headers: dict[str, str] | None = None

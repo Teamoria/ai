@@ -75,6 +75,26 @@ def test_extractions_process_alias_returns_laravel_ready_ai_payload(monkeypatch)
     assert payload["persisted"] is False
 
 
+def test_extractions_process_allows_upload_without_project_id(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    response = client.post(
+        "/api/v1/extractions/process",
+        headers=auth_headers(),
+        json={
+            "upload_id": "upload-without-project",
+            "content": "The company decided to review uploaded files.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["upload_id"] == "upload-without-project"
+    assert payload["project_id"] == ""
+    assert payload["summary"]
+    assert payload["persisted"] is False
+
+
 def test_file_url_download_can_send_laravel_headers(monkeypatch) -> None:
     captured_headers = {}
 
