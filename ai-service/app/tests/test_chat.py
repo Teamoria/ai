@@ -75,3 +75,53 @@ def test_root_ai_conversations_alias_uses_chat_service() -> None:
 
     assert response.status_code == 200
     assert "root conversations endpoint" in response.json()["answer"]
+
+
+def test_retrieval_query_returns_vector_sources(monkeypatch) -> None:
+    from app.services import retrieval_service
+
+    class FakePineconeService:
+        def search_chunks(self, *, project_id: str, question: str, top_k: int = 5) -> list[dict]:
+            return [
+                {
+                    "content": "The meeting assigned Ahmad to prepare the frontend demo.",
+                    "score": 0.91,
+                    "metadata": {
+                        "upload_id": "upload-1",
+                        "project_id": project_id,
+                        "chunk_index": 0,
+                    },
+                }
+            ]
+
+    class FakeLlmService:
+        def answer(self, question: str, context: str) -> str:
+            return f"Answer from vector context: {context}"
+
+    monkeypatch.setattr(
+        retrieval_service,
+        "PineconeService",
+        lambda: FakePineconeService(),
+    )
+    monkeypatch.setattr(
+        retrieval_service,
+        "LlmService",
+        lambda: FakeLlmService(),
+    )
+
+    response = client.post(
+        "/api/v1/retrieval/query",
+        headers=auth_headers(),
+        json={
+            "project_id": "project-1",
+            "question": "Who owns the frontend demo?",
+            "top_k": 3,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["project_id"] == "project-1"
+    assert "Ahmad" in payload["answer"]
+    assert payload["sources"][0]["score"] == 0.91
+    assert payload["sources"][0]["metadata"]["upload_id"] == "upload-1"

@@ -64,7 +64,7 @@ class ProcessUploadResponse(BaseModel):
     decision_items: list[StructuredDecisionPayload] = Field(default_factory=list)
     tasks: list[str] = Field(default_factory=list)
     task_items: list[StructuredTaskPayload] = Field(default_factory=list)
-    chunks: list[KnowledgeChunkResponse] = Field(default_factory=list)
+    chunks: list[KnowledgeChunkResponse] = Field(default_factory=list, exclude=True)
     indexed_chunk_count: int = 0
     persisted: bool = False
 

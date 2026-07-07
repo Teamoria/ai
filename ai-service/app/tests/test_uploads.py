@@ -61,9 +61,30 @@ def test_process_upload_returns_laravel_ready_ai_payload(monkeypatch) -> None:
     assert payload["decision_items"][0]["title"] == "The team decided to connect Laravel uploads to FastAPI"
     assert payload["tasks"] == ["Ahmad will prepare the frontend demo"]
     assert payload["task_items"][0]["title"] == "Ahmad will prepare the frontend demo"
-    assert payload["chunks"][0]["content"]
-    assert payload["chunks"][0]["embedding"]
-    assert payload["chunks"][0]["metadata"]["source"] == "content"
+    assert "chunks" not in payload
+    assert payload["persisted"] is False
+
+
+def test_extractions_process_alias_returns_laravel_ready_ai_payload(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    response = client.post(
+        "/api/v1/extractions/process",
+        headers=auth_headers(),
+        json={
+            "upload_id": "upload-1",
+            "project_id": "project-1",
+            "content": "The team decided to use one stable extraction endpoint.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["upload_id"] == "upload-1"
+    assert payload["project_id"] == "project-1"
+    assert payload["source_type"] == "text"
+    assert payload["summary"]
+    assert "chunks" not in payload
     assert payload["persisted"] is False
 
 

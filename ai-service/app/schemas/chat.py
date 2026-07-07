@@ -42,3 +42,22 @@ class ChatResponse(BaseModel):
     question: str
     answer: str
     sources: list[ChatSource] = Field(default_factory=list)
+
+
+class RetrievalQueryRequest(BaseModel):
+    project_id: str
+    question: str = Field(min_length=2, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+class RetrievalSource(BaseModel):
+    content: str
+    score: float | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RetrievalQueryResponse(BaseModel):
+    project_id: str
+    question: str
+    answer: str
+    sources: list[RetrievalSource] = Field(default_factory=list)

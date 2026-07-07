@@ -204,6 +204,15 @@ def process_upload(request: ProcessUploadRequest) -> ProcessUploadResponse:
     return UploadProcessor().process(request)
 
 
+@router.post(
+    "/extractions/process",
+    response_model=ProcessUploadResponse,
+    dependencies=[Depends(validate_internal_api_key)],
+)
+def process_extraction(request: ProcessUploadRequest) -> ProcessUploadResponse:
+    return process_upload(request)
+
+
 @router.post("/meetings/upload", dependencies=[Depends(validate_internal_api_key)])
 def upload_meeting() -> dict[str, str]:
     return {"status": "deprecated", "replacement": "/api/v1/uploads/process"}

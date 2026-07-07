@@ -1,6 +1,7 @@
 """Pinecone vector database service."""
 
 from app.core.config import settings
+from app.services.embedding_service import EmbeddingService
 
 
 class PineconeService:
@@ -56,6 +57,50 @@ class PineconeService:
 
         return len(vectors)
 
+    def search_chunks(
+        self,
+        *,
+        project_id: str,
+        question: str,
+        top_k: int = 5,
+    ) -> list[dict]:
+        index_name = settings.pinecone_index_name or settings.pinecone_index
+        if not settings.pinecone_api_key or not index_name:
+            return []
+
+        try:
+            from pinecone import Pinecone
+        except ImportError:
+            return []
+
+        try:
+            pc = Pinecone(api_key=settings.pinecone_api_key)
+            index = pc.Index(host=settings.pinecone_host) if settings.pinecone_host else pc.Index(index_name)
+            dimension = _resolve_index_dimension(pc, index_name)
+            query_vector = _fit_vector_dimensions(EmbeddingService().embed(question), dimension)
+            namespace = settings.pinecone_namespace or f"{settings.pinecone_namespace_prefix}-{project_id or 'global'}"
+            result = index.query(
+                vector=query_vector,
+                top_k=top_k,
+                namespace=namespace,
+                include_metadata=True,
+            )
+        except Exception:
+            return []
+
+        matches = result.get("matches", []) if isinstance(result, dict) else getattr(result, "matches", [])
+        sources: list[dict] = []
+        for match in matches:
+            metadata = _match_value(match, "metadata", {}) or {}
+            sources.append(
+                {
+                    "content": metadata.get("text") or metadata.get("content") or "",
+                    "score": _match_value(match, "score", None),
+                    "metadata": metadata,
+                }
+            )
+        return sources
+
 
 def _resolve_index_dimension(pc, index_name: str) -> int:
     try:
@@ -75,3 +120,9 @@ def _fit_vector_dimensions(values: list[float], dimension: int) -> list[float]:
     if len(values) > dimension:
         return values[:dimension]
     return [*values, *([0.0] * (dimension - len(values)))]
+
+
+def _match_value(match, key: str, default):
+    if isinstance(match, dict):
+        return match.get(key, default)
+    return getattr(match, key, default)
