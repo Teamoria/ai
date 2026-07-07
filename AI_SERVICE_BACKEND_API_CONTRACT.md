@@ -201,14 +201,26 @@ Audio/video:
   "upload_id": "upload-1",
   "project_id": "project-1",
   "source_type": "text",
+  "document_type": "meeting",
   "transcript": "Today we reviewed the backend integration. The team decided to connect Laravel uploads to FastAPI. Ahmad will prepare the frontend demo tomorrow.",
   "summary": "Main discussion: Today we reviewed the backend integration. Key decision: The team decided to connect Laravel uploads to FastAPI. Next action: Ahmad will prepare the frontend demo tomorrow.",
+  "structured_result": {
+    "overview": "...",
+    "decisions": [],
+    "tasks": []
+  },
   "decisions": [
     "The team decided to connect Laravel uploads to FastAPI."
   ],
   "tasks": [
     "Ahmad will prepare the frontend demo tomorrow."
   ],
+  "quality": {
+    "extraction": "high",
+    "analysis": "high",
+    "requires_review": false
+  },
+  "warnings": [],
   "chunks": [
     {
       "content": "Today we reviewed the backend integration...",
@@ -232,10 +244,14 @@ Audio/video:
 | `upload_id` | Upload ID sent by PHP | رقم الملف المرسل من PHP |
 | `project_id` | Project ID sent by PHP | رقم المشروع المرسل من PHP |
 | `source_type` | Detected source type: `text`, `pdf`, `docx`, or `media` | نوع المصدر المكتشف |
+| `document_type` | Detected content type: `cv`, `meeting`, `document`, `media`, or `spreadsheet` | نوع المحتوى المكتشف |
 | `transcript` | Extracted text or audio/video transcript | النص المستخرج أو المحول من الصوت/الفيديو |
 | `summary` | Human-readable summary | ملخص مفهوم |
+| `structured_result` | Type-specific result for frontend rendering. CVs include candidate, contact, skills, projects, strengths, gaps, and score. Meetings include decisions and tasks. Documents include title, overview, key points, and topics. | نتيجة منظمة حسب نوع الملف للعرض في الواجهة |
 | `decisions` | Extracted decisions | القرارات المستخرجة |
 | `tasks` | Extracted action items/tasks | المهام المستخرجة |
+| `quality` | Extraction and analysis quality flags | مؤشرات جودة الاستخراج والتحليل |
+| `warnings` | User-facing processing warnings when text is short, medium quality, or may require review | تحذيرات المعالجة عند الحاجة للمراجعة |
 | `chunks` | Text chunks prepared for RAG/indexing | أجزاء النص الجاهزة للبحث والفهرسة |
 | `indexed_chunk_count` | Number of chunks indexed in Pinecone | عدد الـ chunks التي تم فهرستها في Pinecone |
 | `persisted` | Whether AI Service saved to DB | هل خدمة الـ AI حفظت في DB |

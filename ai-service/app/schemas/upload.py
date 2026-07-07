@@ -59,14 +59,18 @@ class ProcessUploadResponse(BaseModel):
     upload_id: str
     project_id: str
     source_type: str = "text"
+    document_type: str = "document"
     transcript: str
     transcript_quality: TranscriptQualityPayload | None = None
     summary: str
     structured_summary: StructuredSummaryPayload | None = None
+    structured_result: dict[str, Any] = Field(default_factory=dict)
     decisions: list[str] = Field(default_factory=list)
     decision_items: list[StructuredDecisionPayload] = Field(default_factory=list)
     tasks: list[str] = Field(default_factory=list)
     task_items: list[StructuredTaskPayload] = Field(default_factory=list)
+    quality: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
     chunks: list[KnowledgeChunkResponse] = Field(default_factory=list, exclude=True)
     indexed_chunk_count: int = 0
     persisted: bool = False

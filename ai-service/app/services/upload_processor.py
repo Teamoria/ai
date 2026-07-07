@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 from app.schemas.upload import KnowledgeChunkResponse, ProcessUploadRequest, ProcessUploadResponse
+from app.services.document_intelligence_service import DocumentIntelligenceService
 from app.services.embedding_service import EmbeddingService
 from app.services.media_transcription_service import MediaTranscriptionService
 from app.services.meeting_intelligence_service import MeetingIntelligenceService
@@ -15,11 +16,13 @@ class UploadProcessor:
     def __init__(
         self,
         meeting_intelligence_service: MeetingIntelligenceService | None = None,
+        document_intelligence_service: DocumentIntelligenceService | None = None,
         embedding_service: EmbeddingService | None = None,
         media_transcription_service: MediaTranscriptionService | None = None,
         pinecone_service: PineconeService | None = None,
     ) -> None:
         self.meeting_intelligence_service = meeting_intelligence_service or MeetingIntelligenceService()
+        self.document_intelligence_service = document_intelligence_service or DocumentIntelligenceService()
         self.embedding_service = embedding_service or EmbeddingService()
         self.media_transcription_service = media_transcription_service or MediaTranscriptionService()
         self.pinecone_service = pinecone_service or PineconeService()
@@ -56,13 +59,19 @@ class UploadProcessor:
 
         report("analyzing")
         analysis = self.meeting_intelligence_service.analyze(transcript)
-        summary = str(analysis["summary"])
+        document_analysis = self.document_intelligence_service.analyze(
+            transcript,
+            source_type=source.source_type,
+            meeting_analysis=analysis,
+        )
+        summary = str(document_analysis.get("summary") or analysis["summary"])
         transcript_quality = analysis.get("transcript_quality")
         decisions = list(analysis["decisions"])
         tasks = list(analysis["tasks"])
         structured_summary = analysis.get("structured_summary")
         decision_items = list(analysis.get("decision_items") or [])
         task_items = list(analysis.get("task_items") or [])
+        document_type = str(document_analysis.get("document_type") or "document")
         report("chunking")
         chunks = [
             KnowledgeChunkResponse(
@@ -72,6 +81,7 @@ class UploadProcessor:
                     "chunk_index": index,
                     "source": source.source,
                     "source_type": source.source_type,
+                    "document_type": document_type,
                 },
             )
             for index, chunk in enumerate(chunk_text(transcript))
@@ -89,14 +99,18 @@ class UploadProcessor:
             upload_id=request.upload_id,
             project_id=project_id,
             source_type=source.source_type,
+            document_type=document_type,
             transcript=transcript,
             transcript_quality=transcript_quality if isinstance(transcript_quality, dict) else None,
             summary=summary,
             structured_summary=structured_summary if isinstance(structured_summary, dict) else None,
+            structured_result=document_analysis.get("structured_result") or {},
             decisions=decisions,
             decision_items=decision_items,
             tasks=tasks,
             task_items=task_items,
+            quality=document_analysis.get("quality") or {},
+            warnings=list(document_analysis.get("warnings") or []),
             chunks=chunks,
             indexed_chunk_count=indexed_chunk_count,
             persisted=False,

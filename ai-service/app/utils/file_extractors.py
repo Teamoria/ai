@@ -278,9 +278,76 @@ def _clean_extracted_text(text: str) -> str:
     candidate = _maybe_fix_mojibake(text)
     candidate = unicodedata.normalize("NFKC", candidate)
     candidate = candidate.replace("\u200f", " ").replace("\u200e", " ")
+    candidate = _collapse_spaced_latin_glyphs(candidate)
     candidate = re.sub(r"[ \t]+", " ", candidate)
     candidate = re.sub(r"\n{3,}", "\n\n", candidate)
     return candidate.strip()
+
+
+def _collapse_spaced_latin_glyphs(text: str) -> str:
+    return "\n".join(_collapse_spaced_latin_line(line) for line in text.splitlines())
+
+
+def _collapse_spaced_latin_line(line: str) -> str:
+    tokens = line.split()
+    if not _looks_like_spaced_latin_glyphs(tokens):
+        return line
+
+    collapsed = []
+    previous = ""
+
+    for token in tokens:
+        current = token
+        if _needs_space_between_spaced_glyphs(previous, current):
+            collapsed.append(" ")
+        collapsed.append(current)
+        previous = current
+
+    line = "".join(collapsed)
+    line = re.sub(r"\s+([,.;:!?%)])", r"\1", line)
+    line = re.sub(r"([(])\s+", r"\1", line)
+    line = re.sub(r"\s*-\s*", "-", line)
+    line = re.sub(r"([a-z])([A-Z])", r"\1 \2", line)
+    line = re.sub(r"([A-Za-z])(\d)", r"\1 \2", line)
+    line = re.sub(r"(\d)([A-Z])", r"\1 \2", line)
+    line = re.sub(r"\b([A-Z]{2,})([A-Z][a-z])", r"\1 \2", line)
+    line = re.sub(r"\b([A-Za-z]{4,})(in|of|to|for|and|with)(?=[A-Z\s]|$)", r"\1 \2", line)
+    return line
+
+
+def _looks_like_spaced_latin_glyphs(tokens: list[str]) -> bool:
+    if len(tokens) < 8:
+        return False
+
+    glyph_tokens = [
+        token
+        for token in tokens
+        if len(token) == 1 and re.match(r"[A-Za-z0-9'&+/#@._-]", token)
+    ]
+    latin_glyph_tokens = [
+        token
+        for token in glyph_tokens
+        if re.match(r"[A-Za-z0-9]", token)
+    ]
+    return len(glyph_tokens) / len(tokens) >= 0.7 and len(latin_glyph_tokens) >= 6
+
+
+def _needs_space_between_spaced_glyphs(previous: str, current: str) -> bool:
+    if not previous:
+        return False
+    if current in ".,;:!?%)":
+        return False
+    if previous in "([/@._-":
+        return False
+    if current in "([/@._-":
+        return True
+    if previous.islower() and current.isupper():
+        return True
+    if previous.isalpha() and current.isdigit():
+        return True
+    if previous.isdigit() and current.isupper():
+        return True
+    return False
 
 
 def _maybe_fix_mojibake(text: str) -> str:
@@ -302,7 +369,22 @@ def _is_low_quality_text(text: str) -> bool:
     clean_text = text.strip()
     if len(clean_text) < 40:
         return True
+    if _has_spaced_latin_glyph_artifacts(clean_text):
+        return True
     return _text_quality_score(clean_text) < 0
+
+
+def _has_spaced_latin_glyph_artifacts(text: str) -> bool:
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return False
+
+    artifact_lines = sum(
+        1
+        for line in lines
+        if _looks_like_spaced_latin_glyphs(line.split())
+    )
+    return artifact_lines / len(lines) >= 0.25
 
 
 def _text_quality_score(text: str) -> int:

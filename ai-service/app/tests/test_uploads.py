@@ -78,9 +78,47 @@ def test_process_file_upload_accepts_multipart_file(monkeypatch) -> None:
     assert payload["upload_id"] == "upload-file-1"
     assert payload["project_id"] == ""
     assert payload["source_type"] == "text"
+    assert payload["document_type"] == "meeting"
     assert payload["decisions"] == ["The team decided to accept direct multipart uploads."]
     assert payload["tasks"] == ["Mona will update the Laravel integration"]
+    assert payload["structured_result"]["tasks"]
     assert "chunks" not in payload
+
+
+def test_process_upload_returns_cv_structured_result(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    response = client.post(
+        "/api/v1/uploads/process",
+        headers=auth_headers(),
+        json={
+            "upload_id": "cv-upload-1",
+            "content": (
+                "Mohammed Zomlot\n"
+                "Software Engineer | Backend Developer\n"
+                "mohammed@example.com\n"
+                "Education\n"
+                "Bachelor's Degree in Software Engineering, Al-Azhar University Gaza\n"
+                "Technical Skills\n"
+                "PHP Laravel REST API MySQL Database Design Flutter Dart Python Git GitHub Linux Postman\n"
+                "Featured Projects\n"
+                "Task Manager API built with Laravel and MySQL.\n"
+                "Achievements\n"
+                "1st Place Gaza programming contest.\n"
+                "Languages\n"
+                "Arabic Native English Intermediate"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["document_type"] == "cv"
+    assert payload["structured_result"]["candidate_name"] == "Mohammed Zomlot"
+    assert "Laravel" in payload["structured_result"]["skills"]
+    assert payload["structured_result"]["contact"]["email"] == "mohammed@example.com"
+    assert payload["structured_result"]["score"] >= 70
+    assert payload["quality"]["analysis"] in {"medium", "high"}
 
 
 def test_extractions_process_alias_returns_laravel_ready_ai_payload(monkeypatch) -> None:
@@ -266,6 +304,24 @@ def test_clean_extracted_text_repairs_arabic_mojibake() -> None:
     mojibake = "بس الدين Thank you".encode("utf-8").decode("latin1")
 
     assert clean_extracted_text(mojibake) == "بس الدين Thank you"
+
+
+def test_clean_extracted_text_collapses_spaced_pdf_glyphs() -> None:
+    spaced_pdf_text = (
+        "B a c h e l o r ' s D e g r e e i n S o f t w a r e\n"
+        "E n g i n e e r i n g\n"
+        "A l - A z h a r U n i v e r s i t y G a z a\n"
+        "2 0 2 1 - P r e s e n t"
+    )
+
+    cleaned = clean_extracted_text(spaced_pdf_text)
+
+    assert "Bachelor's Degree" in cleaned
+    assert "Software" in cleaned
+    assert "Engineering" in cleaned
+    assert "Al-Azhar University Gaza" in cleaned
+    assert "2021-Present" in cleaned
+    assert "B a c h e l o r" not in cleaned
 
 
 def test_process_media_upload_requires_groq_api_key(tmp_path, monkeypatch) -> None:
