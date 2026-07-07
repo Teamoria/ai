@@ -52,6 +52,38 @@ def test_process_upload_returns_laravel_ready_ai_payload(monkeypatch) -> None:
     assert payload["persisted"] is False
 
 
+def test_process_file_upload_accepts_multipart_file(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    response = client.post(
+        "/api/v1/uploads/process-file",
+        headers=auth_headers(),
+        data={
+            "upload_id": "upload-file-1",
+            "project_id": "project-1",
+        },
+        files={
+            "file": (
+                "meeting.txt",
+                (
+                    "The team decided to accept direct multipart uploads. "
+                    "Mona will update the Laravel integration."
+                ),
+                "text/plain",
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["upload_id"] == "upload-file-1"
+    assert payload["project_id"] == "project-1"
+    assert payload["source_type"] == "text"
+    assert payload["decisions"] == ["The team decided to accept direct multipart uploads."]
+    assert payload["tasks"] == ["Mona will update the Laravel integration"]
+    assert "chunks" not in payload
+
+
 def test_extractions_process_alias_returns_laravel_ready_ai_payload(monkeypatch) -> None:
     monkeypatch.setattr(settings, "groq_api_key", "")
 
