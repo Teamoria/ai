@@ -2,6 +2,33 @@
 
 هذا الملف هو نسخة تسليم مختصرة للـ Backend team بعد قراءة ملفات المشروع والـ FastAPI routes.
 
+## تحديث مهم
+
+الـ AI Service لم يعد يملك Upload management APIs ولا جداول تخزين upload داخل قاعدة بياناته.
+Laravel هو المسؤول عن:
+
+```text
+POST /api/v1/uploads
+GET /api/v1/uploads
+GET /api/v1/uploads/{upload}
+GET /api/v1/uploads/{upload}/status
+GET /api/v1/uploads/{upload}/download
+DELETE /api/v1/uploads/{upload}
+POST/DELETE upload permissions
+```
+
+الـ AI Service يستخدم فقط لمعالجة ملف أو نص وإرجاع JSON:
+
+```http
+POST /api/v1/extractions/process
+```
+
+ويبقى alias القديم متاحاً للتوافق:
+
+```http
+POST /api/v1/uploads/process
+```
+
 ## ملاحظة تشغيل مهمة
 
 هذا المشروع ليس Laravel/PHP داخل هذا المجلد، لذلك الأمر التالي لن يعمل هنا:

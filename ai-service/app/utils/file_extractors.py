@@ -11,9 +11,13 @@ from urllib.request import Request, urlopen
 
 from fastapi import HTTPException, status
 
+from app.core.config import settings
+
 
 TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".srt", ".vtt", ".log"}
 DOCUMENT_EXTENSIONS = {".pdf", ".docx"}
+SPREADSHEET_EXTENSIONS = {".xlsx"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"}
 MEDIA_EXTENSIONS = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm", ".mov", ".avi", ".mkv"}
 
 
@@ -30,6 +34,9 @@ def resolve_upload_source(
     content: str | None = None,
     file_path: str | None = None,
     file_url: str | None = None,
+    file_url_headers: dict[str, str] | None = None,
+    file_url_api_key: str | None = None,
+    file_url_bearer_token: str | None = None,
 ) -> UploadSource:
     if content:
         return UploadSource(source_type="text", text=clean_extracted_text(content), source="content")
@@ -46,7 +53,12 @@ def resolve_upload_source(
         return _source_from_path(path, source=file_path)
 
     if file_url:
-        return _source_from_url(file_url)
+        return _source_from_url(
+            file_url,
+            headers=file_url_headers,
+            api_key=file_url_api_key,
+            bearer_token=file_url_bearer_token,
+        )
 
     raise HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -87,6 +99,12 @@ def _source_from_path(path: Path, *, source: str) -> UploadSource:
     if suffix in DOCUMENT_EXTENSIONS:
         return UploadSource(source_type=suffix.removeprefix("."), text=_read_document(path), source=source)
 
+    if suffix in SPREADSHEET_EXTENSIONS:
+        return UploadSource(source_type="xlsx", text=_read_spreadsheet(path), source=source)
+
+    if suffix in IMAGE_EXTENSIONS:
+        return UploadSource(source_type="image", text=_read_image(path), source=source)
+
     if suffix in TEXT_EXTENSIONS or suffix == "":
         return UploadSource(source_type="text", text=clean_extracted_text(path.read_text(encoding="utf-8", errors="ignore")), source=source)
 
@@ -96,14 +114,31 @@ def _source_from_path(path: Path, *, source: str) -> UploadSource:
     )
 
 
-def _source_from_url(file_url: str) -> UploadSource:
-    path = _download_url(file_url)
+def _source_from_url(
+    file_url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    api_key: str | None = None,
+    bearer_token: str | None = None,
+) -> UploadSource:
+    path = _download_url(
+        file_url,
+        headers=headers,
+        api_key=api_key,
+        bearer_token=bearer_token,
+    )
     return _source_from_path(path, source=file_url)
 
 
-def _download_url(file_url: str) -> Path:
+def _download_url(
+    file_url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    api_key: str | None = None,
+    bearer_token: str | None = None,
+) -> Path:
     suffix = Path(urlparse(file_url).path).suffix
-    request = Request(file_url, headers={"User-Agent": "Teamoria-AI-Service/1.0"})
+    request = Request(file_url, headers=_download_headers(headers, api_key, bearer_token))
 
     try:
         with urlopen(request, timeout=20) as response:
@@ -144,6 +179,69 @@ def _read_document(path: Path) -> str:
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail=f"Unsupported document type: {suffix}",
     )
+
+
+def _read_spreadsheet(path: Path) -> str:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Install openpyxl to process XLSX uploads.",
+        ) from exc
+
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    lines: list[str] = []
+    try:
+        for sheet in workbook.worksheets:
+            lines.append(f"Sheet: {sheet.title}")
+            for row in sheet.iter_rows(values_only=True):
+                values = [str(value).strip() for value in row if value is not None and str(value).strip()]
+                if values:
+                    lines.append(" | ".join(values))
+    finally:
+        workbook.close()
+
+    return clean_extracted_text("\n".join(lines))
+
+
+def _read_image(path: Path) -> str:
+    try:
+        from PIL import Image
+        import pytesseract
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Install pillow and pytesseract to process image OCR uploads.",
+        ) from exc
+
+    try:
+        with Image.open(path) as image:
+            return clean_extracted_text(pytesseract.image_to_string(image))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unable to extract text from image upload: {exc}",
+        ) from exc
+
+
+def _download_headers(
+    headers: dict[str, str] | None,
+    api_key: str | None,
+    bearer_token: str | None,
+) -> dict[str, str]:
+    resolved_headers = {"User-Agent": "Teamoria-AI-Service/1.0"}
+
+    effective_api_key = api_key or settings.backend_file_api_key
+    if effective_api_key:
+        resolved_headers[settings.backend_file_api_key_header or "x-api-key"] = effective_api_key
+
+    effective_bearer_token = bearer_token or settings.backend_file_bearer_token
+    if effective_bearer_token:
+        resolved_headers["Authorization"] = f"Bearer {effective_bearer_token}"
+
+    resolved_headers.update(headers or {})
+    return resolved_headers
 
 
 def clean_extracted_text(text: str) -> str:

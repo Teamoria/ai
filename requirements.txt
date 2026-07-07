@@ -20,6 +20,8 @@ tiktoken
 pinecone
 pypdf
 python-docx
+openpyxl
+Pillow
 pdf2image
 pytesseract
 pytest

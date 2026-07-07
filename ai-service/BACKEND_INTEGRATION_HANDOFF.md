@@ -42,20 +42,16 @@ internal_api_key = same value as INTERNAL_API_KEY in ai-service/.env
 base_url = http://127.0.0.1:8001
 ```
 
-## Main Upload APIs
+## Main Upload API
 
-Upload files:
+Laravel owns upload APIs, storage, permissions, processing status, and database
+tables. The AI service does not expose upload storage/list/detail/download/delete
+endpoints and does not create upload-related database tables.
 
-```http
-POST /api/v1/uploads
-Content-Type: multipart/form-data
-X-Internal-API-Key: <INTERNAL_API_KEY>
-```
-
-Process text or a stored file:
+Process text or a Laravel-owned stored file:
 
 ```http
-POST /api/v1/uploads/process
+POST /api/v1/extractions/process
 Content-Type: application/json
 X-Internal-API-Key: <INTERNAL_API_KEY>
 ```
@@ -80,12 +76,18 @@ Or with a stored file path that the AI service can read:
 }
 ```
 
-Check upload status:
+Preferred Laravel-owned file URL:
 
-```http
-GET /api/v1/uploads/{upload_id}/status
-X-Internal-API-Key: <INTERNAL_API_KEY>
+```json
+{
+  "upload_id": "upload-1",
+  "project_id": "project-1",
+  "file_url": "https://backend.example.com/internal/uploads/upload-1/file"
+}
 ```
+
+If the Laravel file URL needs headers, configure `BACKEND_FILE_API_KEY`,
+`BACKEND_FILE_API_KEY_HEADER`, or `BACKEND_FILE_BEARER_TOKEN` in `ai-service/.env`.
 
 ## Laravel Example
 
@@ -94,10 +96,10 @@ $response = Http::withHeaders([
     'X-Internal-API-Key' => config('services.ai.internal_api_key'),
     'X-User-Id' => (string) auth()->id(),
     'X-User-Role' => auth()->user()->role ?? 'user',
-])->post(config('services.ai.base_url') . '/api/v1/uploads/process', [
+])->post(config('services.ai.base_url') . '/api/v1/extractions/process', [
     'upload_id' => (string) $upload->id,
     'project_id' => (string) $upload->project_id,
-    'file_path' => $upload->path,
+    'file_url' => $internalFileUrl,
 ]);
 ```
 

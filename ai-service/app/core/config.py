@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     ffmpeg_path: str = "ffmpeg"
     media_chunk_seconds: int = 300
     upload_temp_dir: str = "tmp/uploads"
+    backend_file_api_key: str = ""
+    backend_file_api_key_header: str = "x-api-key"
+    backend_file_bearer_token: str = ""
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     pinecone_api_key: str = ""

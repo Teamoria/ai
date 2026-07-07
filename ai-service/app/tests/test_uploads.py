@@ -1,15 +1,13 @@
 """Upload processing tests."""
 
-import time
-
 from fastapi.testclient import TestClient
+import pytest
 
-from app.core import database
 from app.core.config import settings
 from app.main import app
 from app.services.meeting_intelligence_service import MeetingIntelligenceService
-from app.services import upload_management_service
-from app.utils.file_extractors import clean_extracted_text
+from app.utils import file_extractors
+from app.utils.file_extractors import clean_extracted_text, resolve_upload_source
 
 
 client = TestClient(app)
@@ -17,17 +15,6 @@ client = TestClient(app)
 
 def auth_headers() -> dict[str, str]:
     return {"X-Internal-API-Key": settings.internal_api_key}
-
-
-def user_headers(user_id: str = "user-1", role: str = "member", company_id: str | None = None) -> dict[str, str]:
-    headers = {
-        **auth_headers(),
-        "X-User-Id": user_id,
-        "X-User-Role": role,
-    }
-    if company_id:
-        headers["X-Company-Id"] = company_id
-    return headers
 
 
 def test_process_upload_returns_laravel_ready_ai_payload(monkeypatch) -> None:
@@ -88,6 +75,53 @@ def test_extractions_process_alias_returns_laravel_ready_ai_payload(monkeypatch)
     assert payload["persisted"] is False
 
 
+def test_file_url_download_can_send_laravel_headers(monkeypatch) -> None:
+    captured_headers = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def read(self):
+            return b"Laravel owned file text."
+
+    def fake_urlopen(request, timeout):
+        captured_headers.update(dict(request.header_items()))
+        return FakeResponse()
+
+    monkeypatch.setattr(file_extractors, "urlopen", fake_urlopen)
+    monkeypatch.setattr(settings, "backend_file_api_key", "service-key")
+    monkeypatch.setattr(settings, "backend_file_api_key_header", "x-api-key")
+    monkeypatch.setattr(settings, "backend_file_bearer_token", "bearer-token")
+
+    source = resolve_upload_source(file_url="https://backend.test/internal/uploads/file.txt")
+
+    assert source.source_type == "text"
+    assert source.text == "Laravel owned file text."
+    assert captured_headers["X-api-key"] == "service-key"
+    assert captured_headers["Authorization"] == "Bearer bearer-token"
+
+
+def test_xlsx_upload_source_extracts_sheet_text(tmp_path) -> None:
+    openpyxl = pytest.importorskip("openpyxl")
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Tasks"
+    sheet.append(["Owner", "Task"])
+    sheet.append(["Ahmad", "Review upload processing"])
+    path = tmp_path / "workbook.xlsx"
+    workbook.save(path)
+
+    source = resolve_upload_source(file_path=str(path))
+
+    assert source.source_type == "xlsx"
+    assert "Sheet: Tasks" in source.text
+    assert "Ahmad | Review upload processing" in source.text
+
+
 def test_process_upload_requires_internal_api_key() -> None:
     response = client.post(
         "/api/v1/uploads/process",
@@ -99,6 +133,16 @@ def test_process_upload_requires_internal_api_key() -> None:
     )
 
     assert response.status_code == 401
+
+
+def test_ai_service_does_not_own_upload_storage_endpoint() -> None:
+    response = client.post(
+        "/api/v1/uploads",
+        headers=auth_headers(),
+        data={"scope": "personal"},
+    )
+
+    assert response.status_code == 404
 
 
 def test_process_upload_ignores_unavailable_pinecone(monkeypatch) -> None:
@@ -168,156 +212,3 @@ def test_process_media_upload_requires_groq_api_key(tmp_path, monkeypatch) -> No
 
     assert response.status_code == 503
     assert "GROQ_API_KEY" in response.json()["detail"]
-
-
-def test_upload_file_creates_record_and_processing_results(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "database_url", f"sqlite:///{tmp_path / 'uploads.db'}")
-    monkeypatch.setattr(settings, "upload_temp_dir", str(tmp_path / "storage"))
-    monkeypatch.setattr(settings, "groq_api_key", "")
-    database.engine = None
-    database.SessionLocal = None
-
-    response = client.post(
-        "/api/v1/uploads",
-        headers=user_headers("user-1"),
-        data={
-            "scope": "personal",
-            "visibility": "private",
-        },
-        files=[
-            (
-                "files",
-                (
-                    "meeting.txt",
-                    b"The team decided to connect uploads. Ahmad will verify the frontend response.",
-                    "text/plain",
-                ),
-            ),
-        ],
-    )
-
-    assert response.status_code == 200
-    upload = response.json()["data"]["uploads"][0]
-    assert upload["processing_status"] == "queued"
-    assert upload["processing_stage"] == "queued"
-    assert upload["processing_progress"] == 10
-    assert "File uploaded" in upload["processing_message"]
-
-    detail_response = None
-    detail = None
-    status_payload = None
-    for _ in range(20):
-        detail_response = client.get(
-            f"/api/v1/uploads/{upload['id']}",
-            headers=user_headers("user-1"),
-        )
-        assert detail_response.status_code == 200
-        detail = detail_response.json()["data"]["upload"]
-        status_response = client.get(
-            f"/api/v1/uploads/{upload['id']}/status",
-            headers=user_headers("user-1"),
-        )
-        assert status_response.status_code == 200
-        status_payload = status_response.json()
-        if detail["processing_status"] == "processed":
-            break
-        time.sleep(0.05)
-
-    assert detail_response is not None
-    assert detail is not None
-    assert detail_response.status_code == 200
-    assert detail["processing_status"] == "processed"
-    assert detail["processing_stage"] == "processed"
-    assert detail["processing_progress"] == 100
-    assert status_payload is not None
-    assert status_payload["stage"] == "processed"
-    assert status_payload["progress"] == 100
-    assert detail["summary"]["summary"]
-    assert detail["decisions"][0]["decision_text"] == "The team decided to connect uploads."
-    assert detail["chunks_count"] >= 1
-
-    duplicate_response = client.post(
-        "/api/v1/uploads",
-        headers=user_headers("user-1"),
-        data={
-            "scope": "personal",
-            "visibility": "private",
-        },
-        files=[
-            (
-                "files",
-                (
-                    "meeting.txt",
-                    b"The team decided to connect uploads. Ahmad will verify the frontend response.",
-                    "text/plain",
-                ),
-            ),
-        ],
-    )
-
-    assert duplicate_response.status_code == 200
-    assert duplicate_response.json()["message"] == "Existing processed file returned"
-    duplicate_upload = duplicate_response.json()["data"]["uploads"][0]
-    assert duplicate_upload["id"] == upload["id"]
-    assert duplicate_upload["processing_status"] == "processed"
-    assert duplicate_upload["already_exists"] is True
-    assert duplicate_upload["has_ai_analysis"] is True
-    assert "already exists" in duplicate_upload["message"]
-
-    forbidden_response = client.get(
-        f"/api/v1/uploads/{upload['id']}",
-        headers=user_headers("user-2"),
-    )
-    assert forbidden_response.status_code == 403
-
-    missing_actor_response = client.get(
-        f"/api/v1/uploads/{upload['id']}",
-        headers=auth_headers(),
-    )
-    assert missing_actor_response.status_code == 422
-
-
-def test_company_member_does_not_see_all_company_uploads(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(settings, "database_url", f"sqlite:///{tmp_path / 'company_uploads.db'}")
-    monkeypatch.setattr(settings, "upload_temp_dir", str(tmp_path / "storage"))
-    monkeypatch.setattr(settings, "groq_api_key", "")
-    database.engine = None
-    database.SessionLocal = None
-    upload_management_service._TABLES_READY = False
-
-    response = client.post(
-        "/api/v1/uploads",
-        headers=user_headers("user-2", "member", "company-1"),
-        data={
-            "scope": "company",
-            "visibility": "members",
-        },
-        files=[
-            (
-                "files",
-                (
-                    "company-plan.txt",
-                    b"Company-only planning notes.",
-                    "text/plain",
-                ),
-            ),
-        ],
-    )
-    assert response.status_code == 200
-    upload = response.json()["data"]["uploads"][0]
-
-    member_response = client.get(
-        "/api/v1/uploads?scope=company",
-        headers=user_headers("user-1", "member", "company-1"),
-    )
-    assert member_response.status_code == 200
-    member_upload_ids = [item["id"] for item in member_response.json()["data"]["uploads"]]
-    assert upload["id"] not in member_upload_ids
-
-    owner_response = client.get(
-        "/api/v1/uploads?scope=company",
-        headers=user_headers("owner-1", "company_owner", "company-1"),
-    )
-    assert owner_response.status_code == 200
-    owner_upload_ids = [item["id"] for item in owner_response.json()["data"]["uploads"]]
-    assert upload["id"] in owner_upload_ids

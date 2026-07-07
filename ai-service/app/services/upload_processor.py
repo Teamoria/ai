@@ -7,7 +7,6 @@ from app.services.embedding_service import EmbeddingService
 from app.services.media_transcription_service import MediaTranscriptionService
 from app.services.meeting_intelligence_service import MeetingIntelligenceService
 from app.services.pinecone_service import PineconeService
-from app.services.upload_persistence_service import UploadPersistenceService
 from app.utils.chunking import chunk_text
 from app.utils.file_extractors import clean_extracted_text, resolve_upload_source
 
@@ -19,13 +18,11 @@ class UploadProcessor:
         embedding_service: EmbeddingService | None = None,
         media_transcription_service: MediaTranscriptionService | None = None,
         pinecone_service: PineconeService | None = None,
-        persistence_service: UploadPersistenceService | None = None,
     ) -> None:
         self.meeting_intelligence_service = meeting_intelligence_service or MeetingIntelligenceService()
         self.embedding_service = embedding_service or EmbeddingService()
         self.media_transcription_service = media_transcription_service or MediaTranscriptionService()
         self.pinecone_service = pinecone_service or PineconeService()
-        self.persistence_service = persistence_service or UploadPersistenceService()
 
     def process(
         self,
@@ -42,6 +39,9 @@ class UploadProcessor:
             content=request.content,
             file_path=request.file_path,
             file_url=request.file_url,
+            file_url_headers=request.file_url_headers,
+            file_url_api_key=request.file_url_api_key,
+            file_url_bearer_token=request.file_url_bearer_token,
         )
 
         if source.source_type == "media":
@@ -82,18 +82,6 @@ class UploadProcessor:
             chunks=chunk_payloads,
         )
         report("saving")
-        persisted = self.persistence_service.save_processing_result(
-            upload_id=request.upload_id,
-            project_id=request.project_id,
-            source_type=source.source_type,
-            transcript=transcript,
-            summary=summary,
-            decisions=decisions,
-            tasks=tasks,
-            structured_summary=structured_summary if isinstance(structured_summary, dict) else None,
-            decision_items=decision_items,
-            task_items=task_items,
-        )
 
         return ProcessUploadResponse(
             upload_id=request.upload_id,
@@ -109,5 +97,5 @@ class UploadProcessor:
             task_items=task_items,
             chunks=chunks,
             indexed_chunk_count=indexed_chunk_count,
-            persisted=persisted,
+            persisted=False,
         )

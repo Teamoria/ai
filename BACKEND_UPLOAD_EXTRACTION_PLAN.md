@@ -41,6 +41,46 @@ file_url
 content
 ```
 
+## Adopted integration mode
+
+Laravel owns uploads, storage, authorization, processing status, and database
+persistence. The AI service only receives a file reference, processes it, and
+returns JSON.
+
+Preferred request from Laravel:
+
+```json
+{
+  "upload_id": "upload-id-from-laravel",
+  "project_id": "project-id-from-laravel",
+  "file_url": "https://backend.example.com/api/v1/internal/uploads/upload-id/file"
+}
+```
+
+If Laravel's file URL needs internal headers, configure the AI service:
+
+```text
+BACKEND_FILE_API_KEY=<laravel internal or x-api-key value>
+BACKEND_FILE_API_KEY_HEADER=x-api-key
+BACKEND_FILE_BEARER_TOKEN=
+```
+
+Alternatively, Laravel can send per-request headers:
+
+```json
+{
+  "upload_id": "upload-id-from-laravel",
+  "project_id": "project-id-from-laravel",
+  "file_url": "https://backend.example.com/api/v1/internal/uploads/upload-id/file",
+  "file_url_headers": {
+    "x-api-key": "internal-key"
+  }
+}
+```
+
+The AI response keeps `persisted=false`; Laravel stores the returned transcript,
+summary, decisions, tasks, and processing status in its own tables.
+
 ### الخيار الأفضل إذا نفس السيرفر أو نفس Docker network
 
 ```json
@@ -185,7 +225,13 @@ Text:
 Documents:
 
 ```text
-.pdf, .docx
+.pdf, .docx, .xlsx
+```
+
+Images:
+
+```text
+.png, .jpg, .jpeg, .gif, .bmp, .tiff, .webp
 ```
 
 Audio/video:

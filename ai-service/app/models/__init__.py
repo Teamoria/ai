@@ -1,14 +1,7 @@
-"""Database models package."""
+"""AI-owned database models.
 
-from app.models.knowledge import KnowledgeChunk
-from app.models.meetings import ExtractedDecision, ExtractedTask, MeetingSummary
-from app.models.uploads import Upload, UploadPermission
+Upload files, summaries, decisions, tasks, and knowledge chunks are owned by
+Laravel. The AI service does not register tables for those records.
+"""
 
-__all__ = [
-    "ExtractedDecision",
-    "ExtractedTask",
-    "KnowledgeChunk",
-    "MeetingSummary",
-    "Upload",
-    "UploadPermission",
-]
+__all__: list[str] = []
