@@ -125,6 +125,28 @@ def test_file_url_download_can_send_laravel_headers(monkeypatch) -> None:
     assert captured_headers["Authorization"] == "Bearer bearer-token"
 
 
+def test_file_url_is_used_when_laravel_file_path_is_not_local(monkeypatch) -> None:
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def read(self):
+            return b"Laravel file from internal URL."
+
+    monkeypatch.setattr(file_extractors, "urlopen", lambda request, timeout: FakeResponse())
+
+    source = resolve_upload_source(
+        file_path="uploads/company/project/documents/missing-locally.txt",
+        file_url="https://backend.test/internal/uploads/file.txt",
+    )
+
+    assert source.source_type == "text"
+    assert source.text == "Laravel file from internal URL."
+
+
 def test_xlsx_upload_source_extracts_sheet_text(tmp_path) -> None:
     openpyxl = pytest.importorskip("openpyxl")
     workbook = openpyxl.Workbook()

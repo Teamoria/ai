@@ -44,13 +44,14 @@ def resolve_upload_source(
     if file_path:
         path = Path(file_path)
 
-        if not path.exists() or not path.is_file():
+        if path.exists() and path.is_file():
+            return _source_from_path(path, source=file_path)
+
+        if not file_url:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="file_path does not exist or is not a file.",
             )
-
-        return _source_from_path(path, source=file_path)
 
     if file_url:
         return _source_from_url(
