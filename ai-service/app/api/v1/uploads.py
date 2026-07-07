@@ -34,7 +34,6 @@ def process_upload(request: ProcessUploadRequest) -> ProcessUploadResponse:
 )
 def process_uploaded_file(
     upload_id: str = Form(...),
-    project_id: str | None = Form(None),
     file: UploadFile = File(...),
 ) -> ProcessUploadResponse:
     suffix = Path(file.filename or "").suffix or ".upload"
@@ -46,7 +45,6 @@ def process_uploaded_file(
     try:
         request = ProcessUploadRequest(
             upload_id=upload_id,
-            project_id=project_id,
             file_path=str(temp_path),
         )
         return UploadProcessor().process(request)
