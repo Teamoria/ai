@@ -53,7 +53,12 @@ class UploadProcessor:
             if source.path is None:
                 raise ValueError("Media source is missing its path.")
             report("transcribing")
-            transcript = clean_extracted_text(self.media_transcription_service.transcribe(source.path))
+            transcript = clean_extracted_text(
+                self.media_transcription_service.transcribe(
+                    source.path,
+                    language=request.transcription_language,
+                )
+            )
         else:
             transcript = clean_extracted_text(source.text or "")
 

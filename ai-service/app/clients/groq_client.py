@@ -12,7 +12,7 @@ from app.core.config import settings
 class GroqWhisperClient:
     """Transcribe audio files through Groq Whisper."""
 
-    def transcribe_audio_file(self, audio_path: Path) -> str:
+    def transcribe_audio_file(self, audio_path: Path, *, language: str | None = None) -> str:
         if not settings.groq_api_key:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -39,8 +39,9 @@ class GroqWhisperClient:
                     "model": settings.groq_transcription_model,
                     "response_format": "text",
                 }
-                if settings.groq_transcription_language:
-                    payload["language"] = settings.groq_transcription_language
+                transcription_language = language or settings.groq_transcription_language
+                if transcription_language:
+                    payload["language"] = transcription_language
                 if settings.groq_transcription_prompt:
                     payload["prompt"] = settings.groq_transcription_prompt
                 result = client.audio.transcriptions.create(**payload)

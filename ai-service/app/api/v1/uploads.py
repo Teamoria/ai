@@ -40,6 +40,7 @@ def process_uploaded_file(
     scope: str | None = Form(default=None),
     visibility: str | None = Form(default=None),
     job_description: str | None = Form(default=None),
+    transcription_language: str | None = Form(default=None),
     file: UploadFile = File(...),
 ) -> ProcessUploadResponse:
     suffix = Path(file.filename or "").suffix or ".upload"
@@ -57,6 +58,7 @@ def process_uploaded_file(
             scope=scope,
             visibility=visibility,
             job_description=job_description,
+            transcription_language=transcription_language,
             file_path=str(temp_path),
         )
         return UploadProcessor().process(request)
@@ -87,6 +89,7 @@ def process_extraction_file(
     scope: str | None = Form(default=None),
     visibility: str | None = Form(default=None),
     job_description: str | None = Form(default=None),
+    transcription_language: str | None = Form(default=None),
     file: UploadFile = File(...),
 ) -> ProcessUploadResponse:
     return process_uploaded_file(
@@ -97,6 +100,7 @@ def process_extraction_file(
         scope=scope,
         visibility=visibility,
         job_description=job_description,
+        transcription_language=transcription_language,
         file=file,
     )
 

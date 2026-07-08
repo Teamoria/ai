@@ -183,7 +183,7 @@ class MeetingIntelligenceService:
             if any(
                 marker in lower_sentence
                 for marker in ["todo", "task", "tasks", "action item", "follow up", "will", "مهمة", "مهام", "تطوير", "إنشاء", "حفظ"]
-            ):
+            ) and self._is_actionable_task(sentence):
                 tasks.append(sentence)
 
         priority = self._extract_priority(clean_transcript)
@@ -349,6 +349,8 @@ class MeetingIntelligenceService:
         heading = re.sub(r"[\s().،:]+", "", item).casefold()
         if heading in {"backend", "frontend", "database", "testing", "المهام", "tasks"}:
             return ""
+        if not self._is_actionable_task(item):
+            return ""
         return item[:500]
 
     def _normalize_text(self, text: str) -> str:
@@ -433,6 +435,8 @@ class MeetingIntelligenceService:
             priority = self._extract_priority(transcript)
             assignee = self._extract_assignee(description)
             status = "pending"
+        if not self._is_actionable_task(description or title):
+            return {}
         return {
             "title": title,
             "description": description,
@@ -444,7 +448,11 @@ class MeetingIntelligenceService:
 
     def _normalize_result(self, result: dict[str, Any]) -> dict[str, Any]:
         decision_items = [self._normalize_decision_item(item) for item in result.get("decision_items") or []]
-        task_items = [self._normalize_task_item(item, "") for item in result.get("task_items") or []]
+        task_items = [
+            item
+            for item in (self._normalize_task_item(item, "") for item in result.get("task_items") or [])
+            if item
+        ]
         structured_summary = result.get("structured_summary") if isinstance(result.get("structured_summary"), dict) else {}
         return {
             "summary": str(result.get("summary") or self.summary_text(structured_summary)),
@@ -459,10 +467,88 @@ class MeetingIntelligenceService:
             "tasks": [
                 str(item)
                 for item in result.get("tasks") or [item["title"] for item in task_items]
-                if str(item).strip()
+                if str(item).strip() and self._is_actionable_task(str(item))
             ],
             "task_items": task_items,
         }
+
+    def _is_actionable_task(self, text: str) -> bool:
+        value = re.sub(r"\s+", " ", str(text or "")).strip()
+        if len(value) < 12:
+            return False
+
+        words = re.findall(r"[\w\u0600-\u06ff]+", value, flags=re.UNICODE)
+        if len(words) < 3:
+            return False
+
+        lower_value = value.casefold()
+        if self._looks_like_media_noise(lower_value):
+            return False
+
+        arabic_action_markers = [
+            "إنشاء",
+            "تطوير",
+            "تنفيذ",
+            "مراجعة",
+            "تحديث",
+            "إضافة",
+            "ربط",
+            "رفع",
+            "حفظ",
+            "اختبار",
+            "إصلاح",
+            "إعداد",
+            "تجهيز",
+            "توثيق",
+            "تحسين",
+            "عرض",
+            "متابعة",
+            "سيقوم",
+            "سوف",
+            "يجب",
+            "لازم",
+            "المطلوب",
+        ]
+        english_action_markers = [
+            " will ",
+            " should ",
+            " must ",
+            " need to ",
+            " needs to ",
+            "todo",
+            "task",
+            "action item",
+            "follow up",
+            "create",
+            "build",
+            "implement",
+            "review",
+            "update",
+            "fix",
+            "test",
+            "prepare",
+            "connect",
+            "upload",
+            "document",
+        ]
+
+        padded = f" {lower_value} "
+        return any(marker.casefold() in lower_value for marker in arabic_action_markers) or any(
+            marker in padded for marker in english_action_markers
+        )
+
+    def _looks_like_media_noise(self, lower_value: str) -> bool:
+        noise_markers = [
+            "click on the bell",
+            "subscribe",
+            "like and subscribe",
+            "watch the bell",
+            "post the bell",
+            "for more information",
+            "remove the link",
+            "show you later",
+        ]
+        return any(marker in lower_value for marker in noise_markers)
 
 
 def dedupe_keep_order(values: list[str]) -> list[str]:

@@ -19,6 +19,7 @@ class ProcessUploadRequest(BaseModel):
     file_url_bearer_token: str | None = None
     content: str | None = None
     job_description: str | None = None
+    transcription_language: str | None = None
 
 
 class KnowledgeChunkResponse(BaseModel):

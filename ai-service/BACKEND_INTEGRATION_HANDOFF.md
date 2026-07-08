@@ -72,6 +72,7 @@ task_id
 scope
 visibility
 job_description
+transcription_language
 ```
 
 Laravel should use this endpoint when it already has the uploaded file and wants
@@ -83,6 +84,7 @@ Example fields:
 upload_id=123
 scope=project
 visibility=members
+transcription_language=ar
 file=@contract.pdf
 ```
 
@@ -139,6 +141,7 @@ $response = Http::withHeaders([
     'project_id' => (string) $upload->project_id,
     'scope' => $upload->scope,
     'visibility' => $upload->visibility,
+    'transcription_language' => $upload->isArabicMedia() ? 'ar' : null,
 ]);
 ```
 

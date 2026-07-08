@@ -18,7 +18,7 @@ class MediaTranscriptionService:
     def __init__(self, whisper_client: GroqWhisperClient | None = None) -> None:
         self.whisper_client = whisper_client or GroqWhisperClient()
 
-    def transcribe(self, media_path: Path) -> str:
+    def transcribe(self, media_path: Path, *, language: str | None = None) -> str:
         if not settings.groq_api_key:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -35,7 +35,7 @@ class MediaTranscriptionService:
             )
             transcripts = []
             for index, chunk_path in enumerate(chunk_paths):
-                text = self.whisper_client.transcribe_audio_file(chunk_path)
+                text = self.whisper_client.transcribe_audio_file(chunk_path, language=language)
                 cleaned_text = _clean_media_transcript(text)
                 if cleaned_text:
                     transcripts.append(

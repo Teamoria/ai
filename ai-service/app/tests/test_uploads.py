@@ -408,6 +408,21 @@ def test_meeting_intelligence_extracts_arabic_tasks_section(monkeypatch) -> None
     assert result["task_items"][2]["category"] == "Frontend"
 
 
+def test_meeting_intelligence_ignores_noisy_media_tasks(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    transcript = (
+        "[00:00:00-00:05:00] I'll give you my hand. But I'll remove the link. "
+        "And I'll show you later. For more information click on the bell to post the bell "
+        "to see the same. If the bell is not spoken by the bell to watch the bell."
+    )
+
+    result = MeetingIntelligenceService().analyze(transcript)
+
+    assert result["tasks"] == []
+    assert result["task_items"] == []
+
+
 def test_clean_extracted_text_repairs_arabic_mojibake() -> None:
     mojibake = "بس الدين Thank you".encode("utf-8").decode("latin1")
 
