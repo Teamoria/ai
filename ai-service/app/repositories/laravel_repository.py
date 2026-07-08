@@ -298,3 +298,50 @@ class LaravelRepository:
 
         rows = self.session.execute(query, params)
         return [dict(row._mapping) for row in rows]
+
+    def ai_chat_knowledge_chunks(
+        self,
+        user_id: str,
+        company_id: str,
+        project_id: str | None = None,
+        limit: int = 40,
+    ) -> list[dict[str, Any]]:
+        rows = self.session.execute(
+            text(
+                """
+                select
+                    kc.id,
+                    kc.project_id,
+                    kc.upload_id,
+                    kc.content,
+                    kc.metadata,
+                    kc.updated_at,
+                    u.file_name,
+                    u.upload_date,
+                    u.updated_at as upload_updated_at,
+                    u.company_id,
+                    u.project_id as upload_project_id,
+                    p.name as project_name
+                from knowledge_chunks kc
+                join uploads u on u.id = kc.upload_id
+                left join projects p on p.id = u.project_id
+                where kc.content is not null
+                  and kc.content <> ''
+                  and (:project_id is null or u.project_id = :project_id or kc.project_id = :project_id)
+                  and (
+                    u.user_id = :user_id
+                    or exists (
+                        select 1
+                        from upload_permissions up
+                        where up.upload_id = u.id
+                          and up.user_id = :user_id
+                    )
+                    or u.company_id = :company_id
+                  )
+                order by coalesce(u.upload_date, u.updated_at, kc.updated_at) desc, kc.id desc
+                limit :limit
+                """
+            ),
+            {"user_id": user_id, "company_id": company_id, "project_id": project_id, "limit": limit},
+        )
+        return [dict(row._mapping) for row in rows]

@@ -71,3 +71,22 @@ def test_company_owner_uploads_are_limited_to_company() -> None:
     assert "u.company_id = :company_id" in session.statement
     assert "u.visibility = 'members'" not in session.statement
     assert session.params["company_id"] == "company-1"
+
+
+def test_ai_chat_chunks_are_limited_to_owner_permissions_or_company() -> None:
+    session = CaptureSession()
+    repository = LaravelRepository(session)  # type: ignore[arg-type]
+
+    repository.ai_chat_knowledge_chunks(user_id="15", company_id="2", project_id="9")
+
+    assert "from knowledge_chunks kc" in session.statement
+    assert "join uploads u on u.id = kc.upload_id" in session.statement
+    assert "u.user_id = :user_id" in session.statement
+    assert ":project_id is null or u.project_id = :project_id or kc.project_id = :project_id" in session.statement
+    assert "from upload_permissions up" in session.statement
+    assert "up.user_id = :user_id" in session.statement
+    assert "u.company_id = :company_id" in session.statement
+    assert "order by coalesce(u.upload_date, u.updated_at, kc.updated_at) desc" in session.statement
+    assert session.params["user_id"] == "15"
+    assert session.params["company_id"] == "2"
+    assert session.params["project_id"] == "9"

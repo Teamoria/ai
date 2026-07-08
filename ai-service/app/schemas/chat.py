@@ -1,6 +1,6 @@
 """Chat schemas."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -42,6 +42,29 @@ class ChatResponse(BaseModel):
     question: str
     answer: str
     sources: list[ChatSource] = Field(default_factory=list)
+
+
+class ChatHistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class AiChatGenerateRequest(BaseModel):
+    user_id: int | str
+    company_id: int | str
+    project_id: int | str | None = None
+    message: str = Field(min_length=2, max_length=4000)
+    chat_history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=30)
+
+
+class AiChatGenerateData(BaseModel):
+    reply: str
+    sources_used: list[str] = Field(default_factory=list)
+
+
+class AiChatGenerateResponse(BaseModel):
+    status: Literal["success"]
+    data: AiChatGenerateData
 
 
 class RetrievalQueryRequest(BaseModel):

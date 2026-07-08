@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
+from app.schemas.chat import AiChatGenerateData, AiChatGenerateResponse
 
 
 client = TestClient(app)
@@ -75,6 +76,53 @@ def test_root_ai_conversations_alias_uses_chat_service() -> None:
 
     assert response.status_code == 200
     assert "root conversations endpoint" in response.json()["answer"]
+
+
+def test_ai_chat_generate_returns_laravel_ready_payload(monkeypatch) -> None:
+    from app.api.v1 import chat
+
+    captured = {}
+
+    class FakeAiChatGenerateService:
+        def generate(self, request):
+            captured["request"] = request
+            return AiChatGenerateResponse(
+                status="success",
+                data=AiChatGenerateData(
+                    reply="لتقديم طلب إجازة، استخدم نموذج الإجازات.",
+                    sources_used=["سياسة_الإجازات.pdf"],
+                ),
+            )
+
+    monkeypatch.setattr(chat, "AiChatGenerateService", FakeAiChatGenerateService)
+
+    response = client.post(
+        "/api/v1/ai/chat/generate",
+        headers=auth_headers(),
+        json={
+            "user_id": 15,
+            "company_id": 2,
+            "project_id": 9,
+            "message": "كيف يمكنني تقديم طلب إجازة؟",
+            "chat_history": [
+                {"role": "user", "content": "مرحباً"},
+                {"role": "assistant", "content": "أهلاً بك، كيف يمكنني مساعدتك؟"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "data": {
+            "reply": "لتقديم طلب إجازة، استخدم نموذج الإجازات.",
+            "sources_used": ["سياسة_الإجازات.pdf"],
+        },
+    }
+    assert captured["request"].user_id == 15
+    assert captured["request"].company_id == 2
+    assert captured["request"].project_id == 9
+    assert captured["request"].chat_history[0].role == "user"
 
 
 def test_retrieval_query_returns_vector_sources(monkeypatch) -> None:

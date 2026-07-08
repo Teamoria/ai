@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.schemas.chat import ChatHistoryMessage
 from openai import OpenAI
 
 from app.core.config import settings
@@ -11,6 +12,14 @@ class LlmService:
     """OpenAI chat completion wrapper with a graceful missing-key response."""
 
     def answer(self, question: str, context: str) -> str:
+        return self.answer_with_history(question, context, [])
+
+    def answer_with_history(
+        self,
+        question: str,
+        context: str,
+        chat_history: list[ChatHistoryMessage],
+    ) -> str:
         if not settings.openai_api_key:
             return (
                 "AI is configured correctly, but OPENAI_API_KEY is missing on the AI service. "
@@ -18,6 +27,10 @@ class LlmService:
             )
 
         client = OpenAI(api_key=settings.openai_api_key)
+        history_messages = [
+            {"role": item.role, "content": item.content}
+            for item in chat_history[-10:]
+        ]
         completion = client.chat.completions.create(
             model=settings.openai_model,
             messages=[
@@ -25,9 +38,12 @@ class LlmService:
                     "role": "system",
                     "content": (
                         "You are Teamoria AI. Answer only from the provided platform context. "
+                        "Use source metadata such as file name, upload date, project ID, and project name "
+                        "when the user asks about uploaded files or the latest company/project documents. "
                         "If the context is insufficient, say so clearly. Match the user's language."
                     ),
                 },
+                *history_messages,
                 {
                     "role": "user",
                     "content": f"Question:\n{question}\n\nPlatform context:\n{context}",
