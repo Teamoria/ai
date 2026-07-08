@@ -117,12 +117,44 @@ def test_ai_chat_generate_returns_laravel_ready_payload(monkeypatch) -> None:
         "data": {
             "reply": "لتقديم طلب إجازة، استخدم نموذج الإجازات.",
             "sources_used": ["سياسة_الإجازات.pdf"],
+            "chat_history": None,
         },
     }
     assert captured["request"].user_id == 15
     assert captured["request"].company_id == 2
     assert captured["request"].project_id == 9
     assert captured["request"].chat_history[0].role == "user"
+
+
+def test_ai_chat_generate_accepts_null_chat_history(monkeypatch) -> None:
+    from app.api.v1 import chat
+
+    class FakeAiChatGenerateService:
+        def generate(self, request):
+            return AiChatGenerateResponse(
+                status="success",
+                data=AiChatGenerateData(
+                    reply="No history was provided.",
+                    sources_used=[],
+                    chat_history=request.chat_history,
+                ),
+            )
+
+    monkeypatch.setattr(chat, "AiChatGenerateService", FakeAiChatGenerateService)
+
+    response = client.post(
+        "/api/v1/ai/chat/generate",
+        headers=auth_headers(),
+        json={
+            "user_id": 15,
+            "company_id": 2,
+            "message": "Hello",
+            "chat_history": None,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["chat_history"] is None
 
 
 def test_retrieval_query_returns_vector_sources(monkeypatch) -> None:

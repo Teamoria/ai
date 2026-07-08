@@ -72,6 +72,8 @@ class AiChatGenerateService:
 
         sources_used = self._source_names(chunks)
         context = self._context(chunks)
+        chat_history = request.chat_history or []
+        response_chat_history = request.chat_history or None
 
         if not context:
             reply = self._empty_context_reply()
@@ -79,12 +81,16 @@ class AiChatGenerateService:
             reply = self.llm_service.answer_with_history(
                 request.message,
                 context,
-                request.chat_history,
+                chat_history,
             )
 
         return AiChatGenerateResponse(
             status="success",
-            data=AiChatGenerateData(reply=reply, sources_used=sources_used),
+            data=AiChatGenerateData(
+                reply=reply,
+                sources_used=sources_used,
+                chat_history=response_chat_history,
+            ),
         )
 
     def _context(self, chunks: list[dict]) -> str:

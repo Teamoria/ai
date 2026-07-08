@@ -54,12 +54,13 @@ class AiChatGenerateRequest(BaseModel):
     company_id: int | str
     project_id: int | str | None = None
     message: str = Field(min_length=2, max_length=4000)
-    chat_history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=30)
+    chat_history: list[ChatHistoryMessage] | None = Field(default=None, max_length=30)
 
 
 class AiChatGenerateData(BaseModel):
     reply: str
     sources_used: list[str] = Field(default_factory=list)
+    chat_history: list[ChatHistoryMessage] | None = None
 
 
 class AiChatGenerateResponse(BaseModel):
