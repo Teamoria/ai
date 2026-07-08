@@ -81,11 +81,12 @@ def test_ai_chat_chunks_are_limited_to_owner_permissions_or_company() -> None:
 
     assert "from knowledge_chunks kc" in session.statement
     assert "join uploads u on u.id = kc.upload_id" in session.statement
-    assert "u.user_id = :user_id" in session.statement
-    assert ":project_id is null or u.project_id = :project_id or kc.project_id = :project_id" in session.statement
+    assert "cast(u.user_id as varchar) = :user_id" in session.statement
+    assert "cast(u.project_id as varchar) = :project_id" in session.statement
+    assert "cast(kc.project_id as varchar) = :project_id" in session.statement
     assert "from upload_permissions up" in session.statement
-    assert "up.user_id = :user_id" in session.statement
-    assert "u.company_id = :company_id" in session.statement
+    assert "cast(up.user_id as varchar) = :user_id" in session.statement
+    assert "cast(u.company_id as varchar) = :company_id" in session.statement
     assert "order by coalesce(u.upload_date, u.updated_at, kc.updated_at) desc" in session.statement
     assert session.params["user_id"] == "15"
     assert session.params["company_id"] == "2"

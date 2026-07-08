@@ -327,16 +327,20 @@ class LaravelRepository:
                 left join projects p on p.id = u.project_id
                 where kc.content is not null
                   and kc.content <> ''
-                  and (:project_id is null or u.project_id = :project_id or kc.project_id = :project_id)
                   and (
-                    u.user_id = :user_id
+                    :project_id is null
+                    or cast(u.project_id as varchar) = :project_id
+                    or cast(kc.project_id as varchar) = :project_id
+                  )
+                  and (
+                    cast(u.user_id as varchar) = :user_id
                     or exists (
                         select 1
                         from upload_permissions up
                         where up.upload_id = u.id
-                          and up.user_id = :user_id
+                          and cast(up.user_id as varchar) = :user_id
                     )
-                    or u.company_id = :company_id
+                    or cast(u.company_id as varchar) = :company_id
                   )
                 order by coalesce(u.upload_date, u.updated_at, kc.updated_at) desc, kc.id desc
                 limit :limit
