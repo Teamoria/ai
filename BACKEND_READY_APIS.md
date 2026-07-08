@@ -500,12 +500,13 @@ $response = Http::withHeaders([
     'X-User-Role' => auth()->user()->role ?? 'member',
     'X-Company-Id' => (string) auth()->user()->company_id,
 ])->attach(
-    'files',
+    'file',
     fopen($path, 'r'),
     basename($path)
-)->post(config('services.ai.base_url') . '/api/v1/uploads', [
+)->post(config('services.ai.base_url') . '/api/v1/extractions/process-file', [
+    'upload_id' => (string) $upload->id,
     'scope' => 'project',
-    'visibility' => 'private',
+    'visibility' => 'members',
     'project_id' => (string) $project->id,
 ]);
 ```

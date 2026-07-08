@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Teamoria AI Service"
+    cors_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:5174,http://127.0.0.1:5174"
+    )
     database_url: str = ""
     db_connection: str = ""
     db_host: str = ""
@@ -91,6 +96,9 @@ class Settings(BaseSettings):
             return f"postgresql+psycopg2://{username}:{password}@{self.db_host}:{port}/{database}"
 
         return "postgresql+psycopg://postgres:postgres@localhost:5432/teamoria_ai"
+
+    def resolved_cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
 settings = Settings()
