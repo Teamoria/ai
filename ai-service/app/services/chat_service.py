@@ -1,5 +1,7 @@
 """Chat session and message service."""
 
+import logging
+
 from app.core.database import get_session
 from app.repositories.laravel_repository import LaravelRepository
 from app.schemas.chat import (
@@ -12,6 +14,9 @@ from app.schemas.chat import (
 )
 from app.services.llm_service import LlmService
 from app.services.rag_service import RagService
+
+
+logger = logging.getLogger(__name__)
 
 
 class ChatService:
@@ -63,18 +68,31 @@ class AiChatGenerateService:
         self.llm_service = llm_service or LlmService()
 
     def generate(self, request: AiChatGenerateRequest) -> AiChatGenerateResponse:
-        with get_session() as session:
-            repository = LaravelRepository(session)
-            project_id = str(request.project_id) if request.project_id is not None else None
-            uploads = repository.ai_chat_visible_uploads(
-                user_id=str(request.user_id),
-                company_id=str(request.company_id),
-                project_id=project_id,
-            )
-            chunks = repository.ai_chat_knowledge_chunks(
-                user_id=str(request.user_id),
-                company_id=str(request.company_id),
-                project_id=project_id,
+        try:
+            with get_session() as session:
+                repository = LaravelRepository(session)
+                project_id = str(request.project_id) if request.project_id is not None else None
+                uploads = repository.ai_chat_visible_uploads(
+                    user_id=str(request.user_id),
+                    company_id=str(request.company_id),
+                    project_id=project_id,
+                )
+                chunks = repository.ai_chat_knowledge_chunks(
+                    user_id=str(request.user_id),
+                    company_id=str(request.company_id),
+                    project_id=project_id,
+                )
+        except Exception:
+            logger.exception("AI chat failed to read visible database context.")
+            return self._fallback_response(
+                reply=(
+                    "\u062a\u0639\u0630\u0631 \u0642\u0631\u0627\u0621\u0629 \u0628\u064a\u0627\u0646\u0627\u062a "
+                    "\u0627\u0644\u0634\u0627\u062a \u0645\u0646 \u0642\u0627\u0639\u062f\u0629 "
+                    "\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u062d\u0627\u0644\u064a\u0627. "
+                    "\u062a\u062d\u0642\u0642 \u0645\u0646 \u0644\u0648\u062c\u0627\u062a \u062e\u062f\u0645\u0629 "
+                    "AI \u0644\u0645\u0639\u0631\u0641\u0629 \u0627\u0644\u0633\u0628\u0628."
+                ),
+                chat_history=request.chat_history,
             )
 
         sources_used = self._source_names(uploads, chunks)
@@ -85,11 +103,20 @@ class AiChatGenerateService:
         if not context:
             reply = self._empty_context_reply()
         else:
-            reply = self.llm_service.answer_with_history(
-                request.message,
-                context,
-                chat_history,
-            )
+            try:
+                reply = self.llm_service.answer_with_history(
+                    request.message,
+                    context,
+                    chat_history,
+                )
+            except Exception:
+                logger.exception("AI chat failed to generate LLM reply.")
+                reply = (
+                    "\u0642\u0631\u0623\u062a \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629\u060c "
+                    "\u0644\u0643\u0646 \u062a\u0639\u0630\u0631 \u062a\u0648\u0644\u064a\u062f \u0631\u062f "
+                    "\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a "
+                    "\u062d\u0627\u0644\u064a\u0627. \u062c\u0631\u0628 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."
+                )
 
         return AiChatGenerateResponse(
             status="success",
@@ -170,6 +197,20 @@ class AiChatGenerateService:
             "\u062a\u0623\u0643\u062f \u0645\u0646 \u0648\u062c\u0648\u062f \u0645\u0644\u0641\u0627\u062a "
             "\u0645\u0639\u0627\u0644\u062c\u0629 \u0623\u0648 \u0635\u0644\u0627\u062d\u064a\u0627\u062a "
             "\u0648\u0635\u0648\u0644 \u0645\u0646\u0627\u0633\u0628\u0629."
+        )
+
+    def _fallback_response(
+        self,
+        reply: str,
+        chat_history: list | None,
+    ) -> AiChatGenerateResponse:
+        return AiChatGenerateResponse(
+            status="success",
+            data=AiChatGenerateData(
+                reply=reply,
+                sources_used=[],
+                chat_history=chat_history or None,
+            ),
         )
 
     def _source_names(self, uploads: list[dict], chunks: list[dict]) -> list[str]:

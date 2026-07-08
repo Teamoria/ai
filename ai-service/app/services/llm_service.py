@@ -26,7 +26,7 @@ class LlmService:
                 "Please add OPENAI_API_KEY and OPENAI_MODEL, then restart the service."
             )
 
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = OpenAI(api_key=settings.openai_api_key, timeout=30.0)
         history_messages = [
             {"role": item.role, "content": item.content}
             for item in chat_history[-10:]
