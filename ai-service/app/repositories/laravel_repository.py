@@ -331,11 +331,9 @@ class LaravelRepository:
                     u.upload_date,
                     u.updated_at as upload_updated_at,
                     u.company_id,
-                    u.project_id as upload_project_id,
-                    p.name as project_name
+                    u.project_id as upload_project_id
                 from knowledge_chunks kc
                 join uploads u on u.id = kc.upload_id
-                left join projects p on p.id = u.project_id
                 where kc.content is not null
                   and kc.content <> ''
                   {project_filter}
