@@ -421,6 +421,24 @@ def test_meeting_intelligence_ignores_noisy_media_tasks(monkeypatch) -> None:
 
     assert result["tasks"] == []
     assert result["task_items"] == []
+    assert result["transcript_quality"]["level"] == "low"
+
+
+def test_meeting_intelligence_ignores_background_music_noise(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    transcript = (
+        "[00:00:00-00:05:00] With respect to the same people, the basic language. "
+        "END Ignore subtitles background music text and background music and background music. "
+        "English Matisseu will be replaced at the same time at the same time. "
+        "For the reason maybe an issue is created by the Ramanic government department."
+    )
+
+    result = MeetingIntelligenceService().analyze(transcript)
+
+    assert result["tasks"] == []
+    assert result["task_items"] == []
+    assert result["transcript_quality"]["level"] == "low"
 
 
 def test_clean_extracted_text_repairs_arabic_mojibake() -> None:

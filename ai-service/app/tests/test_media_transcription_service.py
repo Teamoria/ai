@@ -62,3 +62,25 @@ def test_media_transcription_passes_requested_language(tmp_path, monkeypatch) ->
     service.transcribe(tmp_path / "arabic-meeting.mp4", language="ar")
 
     assert whisper_client.languages == ["ar"]
+
+
+def test_media_transcription_defaults_to_arabic_language(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
+    monkeypatch.setattr(settings, "media_chunk_seconds", 60)
+    monkeypatch.setattr(settings, "groq_transcription_language", "")
+
+    first_chunk = tmp_path / "chunk_0000.mp3"
+    first_chunk.write_bytes(b"fake")
+
+    whisper_client = FakeWhisperClient()
+    service = MediaTranscriptionService(whisper_client=whisper_client)
+    monkeypatch.setattr(service, "_resolve_ffmpeg", lambda: "ffmpeg")
+    monkeypatch.setattr(
+        service,
+        "_extract_audio_chunks",
+        lambda *, ffmpeg_path, media_path, output_dir: [first_chunk],
+    )
+
+    service.transcribe(tmp_path / "arabic-meeting.mp4")
+
+    assert whisper_client.languages == ["ar"]

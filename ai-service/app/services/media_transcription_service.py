@@ -35,7 +35,10 @@ class MediaTranscriptionService:
             )
             transcripts = []
             for index, chunk_path in enumerate(chunk_paths):
-                text = self.whisper_client.transcribe_audio_file(chunk_path, language=language)
+                text = self.whisper_client.transcribe_audio_file(
+                    chunk_path,
+                    language=settings.resolved_transcription_language(language),
+                )
                 cleaned_text = _clean_media_transcript(text)
                 if cleaned_text:
                     transcripts.append(

@@ -110,6 +110,7 @@ class MeetingIntelligenceService:
         word_count = len(words)
         unique_word_ratio = round(len({word.casefold() for word in words}) / max(word_count, 1), 2)
         repeated_phrases = self._repeated_phrase_count(transcript)
+        has_media_noise = self._looks_like_media_noise(transcript.casefold())
         score = 100
         if word_count < 20:
             score -= 45
@@ -119,6 +120,8 @@ class MeetingIntelligenceService:
             score -= 25
         if repeated_phrases >= 2:
             score -= 20
+        if has_media_noise:
+            score -= 65
         if len(transcript.strip()) < 80:
             score -= 15
         score = max(0, min(100, score))
@@ -130,6 +133,7 @@ class MeetingIntelligenceService:
             suggestions = [
                 "Use audio/video with clearer speech and less background noise.",
                 "Keep the speaker close to the microphone.",
+                "For Arabic videos, send transcription_language=ar or set GROQ_TRANSCRIPTION_LANGUAGE=ar.",
                 "Upload a written transcript or captions file when available.",
             ]
         elif level == "medium":
@@ -547,6 +551,14 @@ class MeetingIntelligenceService:
             "for more information",
             "remove the link",
             "show you later",
+            "background music",
+            "ignore subtitles",
+            "subtitles background",
+            "at the same time at the same time",
+            "basic language",
+            "public services",
+            "persons with disabilities",
+            "government department",
         ]
         return any(marker in lower_value for marker in noise_markers)
 

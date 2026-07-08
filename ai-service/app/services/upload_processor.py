@@ -78,11 +78,21 @@ class UploadProcessor:
         decision_items = list(analysis.get("decision_items") or [])
         task_items = list(analysis.get("task_items") or [])
         document_type = str(document_analysis.get("document_type") or "document")
+        warnings = list(document_analysis.get("warnings") or [])
         if document_type not in {"meeting", "media"}:
             decisions = []
             decision_items = []
             tasks = []
             task_items = []
+        if source.source_type == "media" and isinstance(transcript_quality, dict) and transcript_quality.get("level") == "low":
+            decisions = []
+            decision_items = []
+            tasks = []
+            task_items = []
+            warnings.append(
+                "Media transcript quality is low or language detection failed; generated tasks were suppressed. "
+                "Retry with clearer audio or send transcription_language=ar for Arabic videos."
+            )
         report("chunking")
         base_metadata = {
             "upload_id": request.upload_id,
@@ -130,7 +140,7 @@ class UploadProcessor:
             tasks=tasks,
             task_items=task_items,
             quality=document_analysis.get("quality") or {},
-            warnings=list(document_analysis.get("warnings") or []),
+            warnings=warnings,
             chunks=chunks,
             indexed_chunk_count=indexed_chunk_count,
             persisted=False,

@@ -39,7 +39,7 @@ class GroqWhisperClient:
                     "model": settings.groq_transcription_model,
                     "response_format": "text",
                 }
-                transcription_language = language or settings.groq_transcription_language
+                transcription_language = language
                 if transcription_language:
                     payload["language"] = transcription_language
                 if settings.groq_transcription_prompt:

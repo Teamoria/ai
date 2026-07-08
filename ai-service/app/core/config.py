@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_llm_model: str = "llama-3.3-70b-versatile"
     groq_transcription_model: str = "whisper-large-v3-turbo"
-    groq_transcription_language: str = ""
+    groq_transcription_language: str = "ar"
     groq_transcription_prompt: str = (
         "The audio may contain Arabic, English, or mixed Arabic-English project-management discussion. "
         "Transcribe names, product names, API terms, numbers, and technical terms clearly. "
@@ -99,6 +99,12 @@ class Settings(BaseSettings):
 
     def resolved_cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    def resolved_transcription_language(self, requested_language: str | None = None) -> str | None:
+        language = (requested_language or self.groq_transcription_language or "ar").strip()
+        if language.lower() in {"auto", "detect", "none"}:
+            return None
+        return language
 
 
 settings = Settings()
