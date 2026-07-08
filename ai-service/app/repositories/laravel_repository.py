@@ -306,9 +306,20 @@ class LaravelRepository:
         project_id: str | None = None,
         limit: int = 40,
     ) -> list[dict[str, Any]]:
+        project_filter = ""
+        params: dict[str, Any] = {"user_id": user_id, "company_id": company_id, "limit": limit}
+        if project_id is not None:
+            project_filter = """
+                  and (
+                    cast(u.project_id as varchar) = :project_id
+                    or cast(kc.project_id as varchar) = :project_id
+                  )
+            """
+            params["project_id"] = project_id
+
         rows = self.session.execute(
             text(
-                """
+                f"""
                 select
                     kc.id,
                     kc.project_id,
@@ -327,11 +338,7 @@ class LaravelRepository:
                 left join projects p on p.id = u.project_id
                 where kc.content is not null
                   and kc.content <> ''
-                  and (
-                    :project_id is null
-                    or cast(u.project_id as varchar) = :project_id
-                    or cast(kc.project_id as varchar) = :project_id
-                  )
+                  {project_filter}
                   and (
                     cast(u.user_id as varchar) = :user_id
                     or exists (
@@ -346,6 +353,6 @@ class LaravelRepository:
                 limit :limit
                 """
             ),
-            {"user_id": user_id, "company_id": company_id, "project_id": project_id, "limit": limit},
+            params,
         )
         return [dict(row._mapping) for row in rows]

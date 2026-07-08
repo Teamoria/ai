@@ -91,3 +91,16 @@ def test_ai_chat_chunks_are_limited_to_owner_permissions_or_company() -> None:
     assert session.params["user_id"] == "15"
     assert session.params["company_id"] == "2"
     assert session.params["project_id"] == "9"
+
+
+def test_ai_chat_chunks_do_not_bind_project_id_when_missing() -> None:
+    session = CaptureSession()
+    repository = LaravelRepository(session)  # type: ignore[arg-type]
+
+    repository.ai_chat_knowledge_chunks(user_id="15", company_id="2")
+
+    assert "cast(u.project_id as varchar) = :project_id" not in session.statement
+    assert "cast(kc.project_id as varchar) = :project_id" not in session.statement
+    assert "project_id" not in session.params
+    assert session.params["user_id"] == "15"
+    assert session.params["company_id"] == "2"
