@@ -133,7 +133,7 @@ class MeetingIntelligenceService:
             suggestions = [
                 "Use audio/video with clearer speech and less background noise.",
                 "Keep the speaker close to the microphone.",
-                "For Arabic videos, send transcription_language=ar or set GROQ_TRANSCRIPTION_LANGUAGE=ar.",
+                "Send transcription_language=ar for Arabic, en for English, or auto for Arabic/English detection.",
                 "Upload a written transcript or captions file when available.",
             ]
         elif level == "medium":

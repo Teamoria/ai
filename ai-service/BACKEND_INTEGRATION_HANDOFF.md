@@ -75,6 +75,10 @@ job_description
 transcription_language
 ```
 
+`transcription_language` accepts `ar`, `en`, or `auto`. The service never
+passes unsupported language codes to Whisper; current allowed languages are
+Arabic and English only.
+
 Laravel should use this endpoint when it already has the uploaded file and wants
 to send the binary file directly to the AI service without exposing a file URL.
 
