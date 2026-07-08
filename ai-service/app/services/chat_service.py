@@ -64,14 +64,21 @@ class AiChatGenerateService:
 
     def generate(self, request: AiChatGenerateRequest) -> AiChatGenerateResponse:
         with get_session() as session:
-            chunks = LaravelRepository(session).ai_chat_knowledge_chunks(
+            repository = LaravelRepository(session)
+            project_id = str(request.project_id) if request.project_id is not None else None
+            uploads = repository.ai_chat_visible_uploads(
                 user_id=str(request.user_id),
                 company_id=str(request.company_id),
-                project_id=str(request.project_id) if request.project_id is not None else None,
+                project_id=project_id,
+            )
+            chunks = repository.ai_chat_knowledge_chunks(
+                user_id=str(request.user_id),
+                company_id=str(request.company_id),
+                project_id=project_id,
             )
 
-        sources_used = self._source_names(chunks)
-        context = self._context(chunks)
+        sources_used = self._source_names(uploads, chunks)
+        context = self._context(uploads, chunks)
         chat_history = request.chat_history or []
         response_chat_history = request.chat_history or None
 
@@ -93,7 +100,46 @@ class AiChatGenerateService:
             ),
         )
 
-    def _context(self, chunks: list[dict]) -> str:
+    def _context(self, uploads: list[dict], chunks: list[dict]) -> str:
+        parts: list[str] = []
+        upload_context = self._upload_context(uploads)
+        if upload_context:
+            parts.append(upload_context)
+
+        chunk_context = self._chunk_context(chunks)
+        if chunk_context:
+            parts.append(chunk_context)
+
+        return "\n\n".join(parts)
+
+    def _upload_context(self, uploads: list[dict]) -> str:
+        if not uploads:
+            return ""
+
+        lines = ["Latest visible uploads, ordered newest first:"]
+        for index, upload in enumerate(uploads, start=1):
+            file_name = str(upload.get("file_name") or "unknown source")
+            uploaded_at = upload.get("upload_date") or upload.get("updated_at") or ""
+            project_id = upload.get("project_id") or ""
+            access_reason = upload.get("access_reason") or "visible"
+            details = [
+                f"{index}. File: {file_name}",
+                f"Upload ID: {upload.get('id')}",
+                f"Uploaded at: {uploaded_at}",
+                f"Access: {access_reason}",
+                f"Status: {upload.get('status') or ''}",
+                f"Type: {upload.get('file_type') or ''}",
+                f"Category: {upload.get('category') or ''}",
+                f"Scope: {upload.get('scope') or ''}",
+                f"Visibility: {upload.get('visibility') or ''}",
+            ]
+            if project_id:
+                details.append(f"Project ID: {project_id}")
+            lines.append("\n".join(details))
+
+        return "\n\n".join(lines)
+
+    def _chunk_context(self, chunks: list[dict]) -> str:
         parts: list[str] = []
         for index, chunk in enumerate(chunks, start=1):
             content = str(chunk.get("content") or "").strip()
@@ -101,17 +147,14 @@ class AiChatGenerateService:
                 continue
 
             file_name = str(chunk.get("file_name") or "unknown source")
-            project_name = str(chunk.get("project_name") or "").strip()
             project_id = chunk.get("upload_project_id") or chunk.get("project_id") or ""
             uploaded_at = chunk.get("upload_date") or chunk.get("upload_updated_at") or chunk.get("updated_at") or ""
             metadata = [
-                f"Source {index}: {file_name}",
+                f"Processed source {index}: {file_name}",
                 f"Uploaded at: {uploaded_at}",
             ]
             if project_id:
                 metadata.append(f"Project ID: {project_id}")
-            if project_name:
-                metadata.append(f"Project name: {project_name}")
 
             metadata_text = "\n".join(metadata)
             parts.append(f"{metadata_text}\nContent:\n{content}")
@@ -129,12 +172,12 @@ class AiChatGenerateService:
             "\u0648\u0635\u0648\u0644 \u0645\u0646\u0627\u0633\u0628\u0629."
         )
 
-    def _source_names(self, chunks: list[dict]) -> list[str]:
+    def _source_names(self, uploads: list[dict], chunks: list[dict]) -> list[str]:
         names: list[str] = []
         seen: set[str] = set()
 
-        for chunk in chunks:
-            name = str(chunk.get("file_name") or "").strip()
+        for item in [*uploads, *chunks]:
+            name = str(item.get("file_name") or "").strip()
             if name and name not in seen:
                 seen.add(name)
                 names.append(name)

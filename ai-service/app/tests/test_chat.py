@@ -157,6 +157,34 @@ def test_ai_chat_generate_accepts_null_chat_history(monkeypatch) -> None:
     assert response.json()["data"]["chat_history"] is None
 
 
+def test_ai_chat_context_includes_latest_upload_metadata() -> None:
+    from app.services.chat_service import AiChatGenerateService
+
+    service = AiChatGenerateService()
+    context = service._context(  # type: ignore[attr-defined]
+        uploads=[
+            {
+                "id": "upload-1",
+                "file_name": "latest-plan.pdf",
+                "upload_date": "2026-07-09 10:00:00",
+                "project_id": "project-1",
+                "access_reason": "shared",
+                "status": "processed",
+                "file_type": "pdf",
+                "category": "plan",
+                "scope": "project",
+                "visibility": "members",
+            }
+        ],
+        chunks=[],
+    )
+
+    assert "Latest visible uploads, ordered newest first" in context
+    assert "latest-plan.pdf" in context
+    assert "Access: shared" in context
+    assert "Project ID: project-1" in context
+
+
 def test_retrieval_query_returns_vector_sources(monkeypatch) -> None:
     from app.services import retrieval_service
 

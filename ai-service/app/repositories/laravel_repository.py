@@ -354,3 +354,64 @@ class LaravelRepository:
             params,
         )
         return [dict(row._mapping) for row in rows]
+
+    def ai_chat_visible_uploads(
+        self,
+        user_id: str,
+        company_id: str,
+        project_id: str | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        project_filter = ""
+        params: dict[str, Any] = {"user_id": user_id, "company_id": company_id, "limit": limit}
+        if project_id is not None:
+            project_filter = "and cast(u.project_id as varchar) = :project_id"
+            params["project_id"] = project_id
+
+        rows = self.session.execute(
+            text(
+                f"""
+                select
+                    u.id,
+                    u.company_id,
+                    u.project_id,
+                    u.task_id,
+                    u.user_id,
+                    u.scope,
+                    u.visibility,
+                    u.file_name,
+                    u.file_type,
+                    u.category,
+                    u.status,
+                    u.upload_date,
+                    u.updated_at,
+                    case
+                        when cast(u.user_id as varchar) = :user_id then 'owned'
+                        when exists (
+                            select 1
+                            from upload_permissions up
+                            where up.upload_id = u.id
+                              and cast(up.user_id as varchar) = :user_id
+                        ) then 'shared'
+                        when cast(u.company_id as varchar) = :company_id then 'company'
+                        else 'visible'
+                    end as access_reason
+                from uploads u
+                where (
+                    cast(u.user_id as varchar) = :user_id
+                    or exists (
+                        select 1
+                        from upload_permissions up
+                        where up.upload_id = u.id
+                          and cast(up.user_id as varchar) = :user_id
+                    )
+                    or cast(u.company_id as varchar) = :company_id
+                )
+                {project_filter}
+                order by coalesce(u.upload_date, u.updated_at) desc, u.id desc
+                limit :limit
+                """
+            ),
+            params,
+        )
+        return [dict(row._mapping) for row in rows]

@@ -104,3 +104,24 @@ def test_ai_chat_chunks_do_not_bind_project_id_when_missing() -> None:
     assert "project_id" not in session.params
     assert session.params["user_id"] == "15"
     assert session.params["company_id"] == "2"
+
+
+def test_ai_chat_visible_uploads_reads_latest_visible_files() -> None:
+    session = CaptureSession()
+    repository = LaravelRepository(session)  # type: ignore[arg-type]
+
+    repository.ai_chat_visible_uploads(user_id="15", company_id="2", project_id="9")
+
+    assert "from uploads u" in session.statement
+    assert "cast(u.user_id as varchar) = :user_id" in session.statement
+    assert "from upload_permissions up" in session.statement
+    assert "cast(up.user_id as varchar) = :user_id" in session.statement
+    assert "cast(u.company_id as varchar) = :company_id" in session.statement
+    assert "cast(u.project_id as varchar) = :project_id" in session.statement
+    assert "case" in session.statement
+    assert "owned" in session.statement
+    assert "shared" in session.statement
+    assert "order by coalesce(u.upload_date, u.updated_at) desc" in session.statement
+    assert session.params["user_id"] == "15"
+    assert session.params["company_id"] == "2"
+    assert session.params["project_id"] == "9"
