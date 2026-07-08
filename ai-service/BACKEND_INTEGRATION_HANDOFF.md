@@ -48,7 +48,50 @@ Laravel owns upload APIs, storage, permissions, processing status, and database
 tables. The AI service does not expose upload storage/list/detail/download/delete
 endpoints and does not create upload-related database tables.
 
-Process text or a Laravel-owned stored file:
+Process a Laravel-owned ready file directly:
+
+```http
+POST /api/v1/extractions/process-file
+Content-Type: multipart/form-data
+X-Internal-API-Key: <INTERNAL_API_KEY>
+```
+
+Required form fields:
+
+```text
+upload_id
+file
+```
+
+Optional form fields:
+
+```text
+company_id
+project_id
+task_id
+scope
+visibility
+job_description
+```
+
+Laravel should use this endpoint when it already has the uploaded file and wants
+to send the binary file directly to the AI service without exposing a file URL.
+
+Example fields:
+
+```text
+upload_id=123
+scope=project
+visibility=members
+file=@contract.pdf
+```
+
+The AI service stores the uploaded binary in a temporary file only for the
+duration of processing, then deletes it. Laravel remains responsible for
+permanent storage, permissions, processing status, and database persistence.
+
+Legacy JSON processing is still available for raw text, local paths, or a
+Laravel-owned internal URL:
 
 ```http
 POST /api/v1/extractions/process
@@ -76,18 +119,8 @@ Or with a stored file path that the AI service can read:
 }
 ```
 
-Preferred Laravel-owned file URL:
-
-```json
-{
-  "upload_id": "upload-1",
-  "project_id": "project-1",
-  "file_url": "https://backend.example.com/internal/uploads/upload-1/file"
-}
-```
-
-If the Laravel file URL needs headers, configure `BACKEND_FILE_API_KEY`,
-`BACKEND_FILE_API_KEY_HEADER`, or `BACKEND_FILE_BEARER_TOKEN` in `ai-service/.env`.
+Do not use `file_url` for the main Laravel integration unless direct multipart
+upload is not possible.
 
 ## Laravel Example
 
@@ -96,12 +129,88 @@ $response = Http::withHeaders([
     'X-Internal-API-Key' => config('services.ai.internal_api_key'),
     'X-User-Id' => (string) auth()->id(),
     'X-User-Role' => auth()->user()->role ?? 'user',
-])->post(config('services.ai.base_url') . '/api/v1/extractions/process', [
+])->attach(
+    'file',
+    fopen($upload->path, 'r'),
+    $upload->original_name
+)->post(config('services.ai.base_url') . '/api/v1/extractions/process-file', [
     'upload_id' => (string) $upload->id,
+    'company_id' => (string) $upload->company_id,
     'project_id' => (string) $upload->project_id,
-    'file_url' => $internalFileUrl,
+    'scope' => $upload->scope,
+    'visibility' => $upload->visibility,
 ]);
 ```
+
+## Laravel Persistence Contract
+
+After a successful AI response, Laravel should save these fields on its own
+upload/analysis tables:
+
+```text
+processing_status = processed
+source_type
+document_type
+transcript
+transcript_quality
+summary
+structured_summary
+structured_result
+decisions
+decision_items
+tasks
+task_items
+quality
+warnings
+indexed_chunk_count
+processed_at
+```
+
+If the AI request fails, Laravel should save:
+
+```text
+processing_status = failed
+processing_error = response body or exception message
+```
+
+Recommended background flow:
+
+```text
+1. Laravel stores the uploaded file.
+2. Laravel creates upload record with processing_status=queued.
+3. Laravel dispatches an upload-processing job.
+4. The job sets processing_status=processing.
+5. The job sends multipart file to /api/v1/extractions/process-file.
+6. The job saves the AI response and sets processing_status=processed.
+7. On non-2xx or exception, the job saves processing_status=failed.
+```
+
+## Retrieval API
+
+Use this endpoint after uploads are indexed in Pinecone:
+
+```http
+POST /api/v1/retrieval/query
+Content-Type: application/json
+X-Internal-API-Key: <INTERNAL_API_KEY>
+```
+
+Request:
+
+```json
+{
+  "project_id": "project-1",
+  "company_id": "company-1",
+  "scope": "project",
+  "visibility": "members",
+  "question": "What are the contract parties?",
+  "top_k": 5
+}
+```
+
+The AI service filters vector search by `project_id`, and when provided also by
+`company_id`, `scope`, and `visibility`. Returned sources include metadata such
+as `upload_id`, `document_type`, `chunk_index`, `source_id`, and `snippet`.
 
 Recommended Laravel `.env` values:
 

@@ -63,6 +63,7 @@ class UploadProcessor:
             transcript,
             source_type=source.source_type,
             meeting_analysis=analysis,
+            job_description=request.job_description,
         )
         summary = str(document_analysis.get("summary") or analysis["summary"])
         transcript_quality = analysis.get("transcript_quality")
@@ -72,16 +73,30 @@ class UploadProcessor:
         decision_items = list(analysis.get("decision_items") or [])
         task_items = list(analysis.get("task_items") or [])
         document_type = str(document_analysis.get("document_type") or "document")
+        if document_type not in {"meeting", "media"}:
+            decisions = []
+            decision_items = []
+            tasks = []
+            task_items = []
         report("chunking")
+        base_metadata = {
+            "upload_id": request.upload_id,
+            "company_id": request.company_id,
+            "project_id": project_id,
+            "task_id": request.task_id,
+            "scope": request.scope,
+            "visibility": request.visibility,
+            "source": source.source,
+            "source_type": source.source_type,
+            "document_type": document_type,
+        }
         chunks = [
             KnowledgeChunkResponse(
                 content=chunk,
                 embedding=self.embedding_service.embed(chunk),
                 metadata={
+                    **base_metadata,
                     "chunk_index": index,
-                    "source": source.source,
-                    "source_type": source.source_type,
-                    "document_type": document_type,
                 },
             )
             for index, chunk in enumerate(chunk_text(transcript))

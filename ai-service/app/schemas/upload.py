@@ -7,13 +7,18 @@ from pydantic import BaseModel, Field
 
 class ProcessUploadRequest(BaseModel):
     upload_id: str
+    company_id: str | None = None
     project_id: str | None = None
+    task_id: str | None = None
+    scope: str | None = None
+    visibility: str | None = None
     file_path: str | None = None
     file_url: str | None = None
     file_url_headers: dict[str, str] | None = None
     file_url_api_key: str | None = None
     file_url_bearer_token: str | None = None
     content: str | None = None
+    job_description: str | None = None
 
 
 class KnowledgeChunkResponse(BaseModel):

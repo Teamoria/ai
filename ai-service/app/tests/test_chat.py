@@ -80,8 +80,29 @@ def test_root_ai_conversations_alias_uses_chat_service() -> None:
 def test_retrieval_query_returns_vector_sources(monkeypatch) -> None:
     from app.services import retrieval_service
 
+    captured = {}
+
     class FakePineconeService:
-        def search_chunks(self, *, project_id: str, question: str, top_k: int = 5) -> list[dict]:
+        def search_chunks(
+            self,
+            *,
+            project_id: str,
+            company_id: str | None = None,
+            scope: str | None = None,
+            visibility: str | None = None,
+            question: str,
+            top_k: int = 5,
+        ) -> list[dict]:
+            captured.update(
+                {
+                    "project_id": project_id,
+                    "company_id": company_id,
+                    "scope": scope,
+                    "visibility": visibility,
+                    "question": question,
+                    "top_k": top_k,
+                }
+            )
             return [
                 {
                     "content": "The meeting assigned Ahmad to prepare the frontend demo.",
@@ -114,6 +135,9 @@ def test_retrieval_query_returns_vector_sources(monkeypatch) -> None:
         headers=auth_headers(),
         json={
             "project_id": "project-1",
+            "company_id": "company-1",
+            "scope": "project",
+            "visibility": "members",
             "question": "Who owns the frontend demo?",
             "top_k": 3,
         },
@@ -125,3 +149,11 @@ def test_retrieval_query_returns_vector_sources(monkeypatch) -> None:
     assert "Ahmad" in payload["answer"]
     assert payload["sources"][0]["score"] == 0.91
     assert payload["sources"][0]["metadata"]["upload_id"] == "upload-1"
+    assert captured == {
+        "project_id": "project-1",
+        "company_id": "company-1",
+        "scope": "project",
+        "visibility": "members",
+        "question": "Who owns the frontend demo?",
+        "top_k": 3,
+    }

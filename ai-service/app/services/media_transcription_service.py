@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+import re
 
 from fastapi import HTTPException, status
 
@@ -32,10 +33,14 @@ class MediaTranscriptionService:
                 media_path=media_path,
                 output_dir=Path(temp_dir),
             )
-            transcripts = [
-                self.whisper_client.transcribe_audio_file(chunk_path)
-                for chunk_path in chunk_paths
-            ]
+            transcripts = []
+            for index, chunk_path in enumerate(chunk_paths):
+                text = self.whisper_client.transcribe_audio_file(chunk_path)
+                cleaned_text = _clean_media_transcript(text)
+                if cleaned_text:
+                    transcripts.append(
+                        f"{_timestamp_range(index, settings.media_chunk_seconds)} {cleaned_text}"
+                    )
 
         return " ".join(part for part in transcripts if part).strip()
 
@@ -118,3 +123,49 @@ class MediaTranscriptionService:
             )
 
         return chunk_paths
+
+
+def _timestamp_range(index: int, chunk_seconds: int) -> str:
+    start = index * chunk_seconds
+    end = start + chunk_seconds
+    return f"[{_format_timestamp(start)}-{_format_timestamp(end)}]"
+
+
+def _format_timestamp(total_seconds: int) -> str:
+    minutes, seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _clean_media_transcript(text: str) -> str:
+    normalized = " ".join(str(text or "").split())
+    if not normalized:
+        return ""
+
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?؟])\s+", normalized)
+        if sentence.strip()
+    ]
+    if not sentences:
+        return normalized
+
+    cleaned_sentences = []
+    previous_key = ""
+    repeated_count = 0
+    for sentence in sentences:
+        key = _transcript_sentence_key(sentence)
+        if key == previous_key:
+            repeated_count += 1
+            if repeated_count >= 1:
+                continue
+        else:
+            repeated_count = 0
+        cleaned_sentences.append(sentence)
+        previous_key = key
+
+    return " ".join(cleaned_sentences).strip()
+
+
+def _transcript_sentence_key(sentence: str) -> str:
+    return re.sub(r"[\W_]+", "", sentence.casefold())

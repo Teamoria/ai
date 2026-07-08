@@ -85,6 +85,38 @@ def test_process_file_upload_accepts_multipart_file(monkeypatch) -> None:
     assert "chunks" not in payload
 
 
+def test_extractions_process_file_accepts_laravel_multipart_contract(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    response = client.post(
+        "/api/v1/extractions/process-file",
+        headers=auth_headers(),
+        data={
+            "upload_id": "upload-file-2",
+            "company_id": "company-1",
+            "project_id": "project-1",
+            "scope": "project",
+            "visibility": "members",
+        },
+        files={
+            "file": (
+                "meeting.txt",
+                "The team decided to process ready files directly. Omar will review the extraction output.",
+                "text/plain",
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["upload_id"] == "upload-file-2"
+    assert payload["project_id"] == "project-1"
+    assert payload["source_type"] == "text"
+    assert payload["decisions"] == ["The team decided to process ready files directly."]
+    assert payload["tasks"] == ["Omar will review the extraction output"]
+    assert payload["persisted"] is False
+
+
 def test_process_upload_returns_cv_structured_result(monkeypatch) -> None:
     monkeypatch.setattr(settings, "groq_api_key", "")
 
@@ -119,6 +151,82 @@ def test_process_upload_returns_cv_structured_result(monkeypatch) -> None:
     assert payload["structured_result"]["contact"]["email"] == "mohammed@example.com"
     assert payload["structured_result"]["score"] >= 70
     assert payload["quality"]["analysis"] in {"medium", "high"}
+    assert payload["decisions"] == []
+    assert payload["tasks"] == []
+    assert payload["decision_items"] == []
+    assert payload["task_items"] == []
+
+
+def test_process_upload_returns_contract_structured_result(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    response = client.post(
+        "/api/v1/extractions/process",
+        headers=auth_headers(),
+        json={
+            "upload_id": "contract-upload-1",
+            "company_id": "company-1",
+            "scope": "company",
+            "visibility": "members",
+            "content": (
+                "Service Agreement\n"
+                "Party A: Teamoria LLC\n"
+                "Party B: Acme Services\n"
+                "Effective Date: 2026-08-01\n"
+                "End Date: 2027-08-01\n"
+                "Payment Terms: Acme Services will be paid 10,000 USD in two installments.\n"
+                "The provider shall deliver monthly support reports.\n"
+                "Termination: Either party may terminate with 30 days written notice."
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    result = payload["structured_result"]
+    assert payload["document_type"] == "contract"
+    assert "Teamoria LLC" in result["parties"]
+    assert "Acme Services" in result["parties"]
+    assert result["start_date"] == "2026-08-01"
+    assert result["end_date"] == "2027-08-01"
+    assert result["payments"]
+    assert result["termination_terms"]
+    assert "executive_summary" in result
+    assert isinstance(result["legal_risk_score"], int)
+    assert result["clause_review"]
+    assert payload["decisions"] == []
+    assert payload["tasks"] == []
+    assert payload["decision_items"] == []
+    assert payload["task_items"] == []
+
+
+def test_cv_job_description_match_returns_score(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "")
+
+    response = client.post(
+        "/api/v1/extractions/process",
+        headers=auth_headers(),
+        json={
+            "upload_id": "cv-match-1",
+            "content": (
+                "Sara Ahmad\n"
+                "Laravel Backend Developer\n"
+                "sara@example.com\n"
+                "Technical Skills\n"
+                "PHP Laravel REST API MySQL Docker Git GitHub Linux Postman\n"
+                "Experience\n"
+                "Built REST APIs and database-backed services using Laravel and MySQL."
+            ),
+            "job_description": "We need a Laravel backend developer with PHP, REST API, MySQL, Docker, and Git experience.",
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()["structured_result"]
+    assert response.json()["document_type"] == "cv"
+    assert result["job_match"]["score"] > 0
+    assert "Laravel" in result["job_match"]["matched_skills"]
+    assert result["recommendations"]
 
 
 def test_extractions_process_alias_returns_laravel_ready_ai_payload(monkeypatch) -> None:

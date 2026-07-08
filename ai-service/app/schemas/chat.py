@@ -46,6 +46,9 @@ class ChatResponse(BaseModel):
 
 class RetrievalQueryRequest(BaseModel):
     project_id: str
+    company_id: str | None = None
+    scope: str | None = None
+    visibility: str | None = None
     question: str = Field(min_length=2, max_length=2000)
     top_k: int = Field(default=5, ge=1, le=20)
 

@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+import base64
+import mimetypes
+import os
 import re
 import unicodedata
 from urllib.parse import urlparse
@@ -209,6 +212,8 @@ def _read_spreadsheet(path: Path) -> str:
 def _read_image(path: Path) -> str:
     try:
         from PIL import Image
+        from PIL import ImageFilter
+        from PIL import ImageOps
         import pytesseract
     except ImportError as exc:
         raise HTTPException(
@@ -218,12 +223,93 @@ def _read_image(path: Path) -> str:
 
     try:
         with Image.open(path) as image:
-            return clean_extracted_text(pytesseract.image_to_string(image))
+            prepared_image = _prepare_image_for_ocr(image, ImageFilter, ImageOps)
+            _configure_tesseract(pytesseract)
+            config = _tesseract_config()
+            try:
+                text = pytesseract.image_to_string(prepared_image, lang="ara+eng", config=config)
+            except pytesseract.TesseractError:
+                text = pytesseract.image_to_string(prepared_image, lang="eng", config=config)
+            return clean_extracted_text(text)
     except Exception as exc:
+        fallback_text = _read_image_with_openai_vision(path)
+        if fallback_text:
+            return clean_extracted_text(fallback_text)
+
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unable to extract text from image upload: {exc}",
+            detail=(
+                f"Unable to extract text from image upload: {exc}. "
+                "Install Tesseract with Arabic/English language data, or configure OPENAI_API_KEY for vision fallback."
+            ),
         ) from exc
+
+
+def _prepare_image_for_ocr(image, image_filter, image_ops):
+    """Improve common scan/photo OCR cases without changing the original file."""
+
+    prepared = image.convert("L")
+    prepared = image_ops.autocontrast(prepared)
+    prepared = prepared.filter(image_filter.SHARPEN)
+    return prepared
+
+
+def _configure_tesseract(pytesseract_module) -> None:
+    tesseract_cmd = Path(settings.tesseract_cmd)
+    if tesseract_cmd.exists():
+        pytesseract_module.pytesseract.tesseract_cmd = str(tesseract_cmd)
+
+    tessdata_dir = Path(settings.tesseract_tessdata_dir)
+    if tessdata_dir.exists():
+        os.environ["TESSDATA_PREFIX"] = str(tessdata_dir)
+
+
+def _tesseract_config() -> str:
+    return ""
+
+
+def _read_image_with_openai_vision(path: Path) -> str:
+    if not settings.openai_api_key:
+        return ""
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return ""
+
+    mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
+    image_data = base64.b64encode(path.read_bytes()).decode("ascii")
+    client = OpenAI(api_key=settings.openai_api_key)
+
+    try:
+        completion = client.chat.completions.create(
+            model=settings.openai_vision_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract readable text from the image. Preserve Arabic and English as written. "
+                        "Return text only, without commentary."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_data}",
+                            },
+                        }
+                    ],
+                },
+            ],
+            temperature=0,
+        )
+    except Exception:
+        return ""
+
+    return completion.choices[0].message.content or ""
 
 
 def _download_headers(

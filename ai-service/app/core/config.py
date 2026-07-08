@@ -34,24 +34,31 @@ class Settings(BaseSettings):
     groq_transcription_language: str = ""
     groq_transcription_prompt: str = (
         "The audio may contain Arabic, English, or mixed Arabic-English project-management discussion. "
-        "Transcribe names and technical terms clearly. Do not translate; preserve the spoken language."
+        "Transcribe names, product names, API terms, numbers, and technical terms clearly. "
+        "Do not translate; preserve the spoken language. Ignore subtitles, background music, repeated filler, "
+        "and unrelated captions when they are not spoken by the main speaker."
     )
     groq_verify_ssl: bool = True
     groq_request_timeout: float = 90.0
     ffmpeg_path: str = "ffmpeg"
     media_chunk_seconds: int = 300
     upload_temp_dir: str = "tmp/uploads"
+    tesseract_cmd: str = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    tesseract_tessdata_dir: str = str(AI_SERVICE_ROOT / "tessdata")
     backend_file_api_key: str = ""
     backend_file_api_key_header: str = "x-api-key"
     backend_file_bearer_token: str = ""
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    openai_vision_model: str = "gpt-4o-mini"
     pinecone_api_key: str = ""
     pinecone_index: str = ""
     pinecone_index_name: str = ""
     pinecone_host: str = ""
     pinecone_namespace: str = ""
     pinecone_namespace_prefix: str = "teamoria"
+    embedding_provider: str = "local"
+    embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1024
 
     @model_validator(mode="after")

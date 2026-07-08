@@ -17,6 +17,9 @@ class RetrievalService:
     def query(self, request: RetrievalQueryRequest) -> RetrievalQueryResponse:
         chunks = self.pinecone_service.search_chunks(
             project_id=request.project_id,
+            company_id=request.company_id,
+            scope=request.scope,
+            visibility=request.visibility,
             question=request.question,
             top_k=request.top_k,
         )

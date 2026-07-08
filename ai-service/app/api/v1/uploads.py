@@ -34,6 +34,12 @@ def process_upload(request: ProcessUploadRequest) -> ProcessUploadResponse:
 )
 def process_uploaded_file(
     upload_id: str = Form(...),
+    company_id: str | None = Form(default=None),
+    project_id: str | None = Form(default=None),
+    task_id: str | None = Form(default=None),
+    scope: str | None = Form(default=None),
+    visibility: str | None = Form(default=None),
+    job_description: str | None = Form(default=None),
     file: UploadFile = File(...),
 ) -> ProcessUploadResponse:
     suffix = Path(file.filename or "").suffix or ".upload"
@@ -45,6 +51,12 @@ def process_uploaded_file(
     try:
         request = ProcessUploadRequest(
             upload_id=upload_id,
+            company_id=company_id,
+            project_id=project_id,
+            task_id=task_id,
+            scope=scope,
+            visibility=visibility,
+            job_description=job_description,
             file_path=str(temp_path),
         )
         return UploadProcessor().process(request)
@@ -62,6 +74,33 @@ def process_extraction(request: ProcessUploadRequest) -> ProcessUploadResponse:
     return process_upload(request)
 
 
+@router.post(
+    "/extractions/process-file",
+    response_model=ProcessUploadResponse,
+    dependencies=[Depends(validate_internal_api_key)],
+)
+def process_extraction_file(
+    upload_id: str = Form(...),
+    company_id: str | None = Form(default=None),
+    project_id: str | None = Form(default=None),
+    task_id: str | None = Form(default=None),
+    scope: str | None = Form(default=None),
+    visibility: str | None = Form(default=None),
+    job_description: str | None = Form(default=None),
+    file: UploadFile = File(...),
+) -> ProcessUploadResponse:
+    return process_uploaded_file(
+        upload_id=upload_id,
+        company_id=company_id,
+        project_id=project_id,
+        task_id=task_id,
+        scope=scope,
+        visibility=visibility,
+        job_description=job_description,
+        file=file,
+    )
+
+
 @router.post("/meetings/upload", dependencies=[Depends(validate_internal_api_key)])
 def upload_meeting() -> dict[str, str]:
-    return {"status": "deprecated", "replacement": "/api/v1/extractions/process"}
+    return {"status": "deprecated", "replacement": "/api/v1/extractions/process-file"}

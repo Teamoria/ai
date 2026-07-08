@@ -24,6 +24,7 @@ class PineconeService:
             return 0
 
         try:
+            _enable_system_certificates()
             pc = Pinecone(api_key=settings.pinecone_api_key)
             index = pc.Index(host=settings.pinecone_host) if settings.pinecone_host else pc.Index(index_name)
         except Exception:
@@ -36,12 +37,14 @@ class PineconeService:
             {
                 "id": f"{upload_id}-{chunk['metadata']['chunk_index']}",
                 "values": _fit_vector_dimensions(chunk["embedding"], dimension),
-                "metadata": {
-                    **chunk["metadata"],
-                    "upload_id": upload_id,
-                    "project_id": project_id,
-                    "text": chunk["content"],
-                },
+                "metadata": _pinecone_metadata(
+                    {
+                        **chunk["metadata"],
+                        "upload_id": upload_id,
+                        "project_id": project_id,
+                        "text": chunk["content"],
+                    }
+                ),
             }
             for chunk in chunks
             if chunk.get("embedding")
@@ -61,6 +64,9 @@ class PineconeService:
         self,
         *,
         project_id: str,
+        company_id: str | None = None,
+        scope: str | None = None,
+        visibility: str | None = None,
         question: str,
         top_k: int = 5,
     ) -> list[dict]:
@@ -74,6 +80,7 @@ class PineconeService:
             return []
 
         try:
+            _enable_system_certificates()
             pc = Pinecone(api_key=settings.pinecone_api_key)
             index = pc.Index(host=settings.pinecone_host) if settings.pinecone_host else pc.Index(index_name)
             dimension = _resolve_index_dimension(pc, index_name)
@@ -83,6 +90,12 @@ class PineconeService:
                 vector=query_vector,
                 top_k=top_k,
                 namespace=namespace,
+                filter=_search_filter(
+                    project_id=project_id,
+                    company_id=company_id,
+                    scope=scope,
+                    visibility=visibility,
+                ),
                 include_metadata=True,
             )
         except Exception:
@@ -96,10 +109,61 @@ class PineconeService:
                 {
                     "content": metadata.get("text") or metadata.get("content") or "",
                     "score": _match_value(match, "score", None),
-                    "metadata": metadata,
+                    "metadata": _source_metadata(metadata),
                 }
             )
         return sources
+
+
+def _enable_system_certificates() -> None:
+    try:
+        import truststore
+    except ImportError:
+        return
+
+    try:
+        truststore.inject_into_ssl()
+    except Exception:
+        return
+
+
+def _pinecone_metadata(metadata: dict) -> dict:
+    return {
+        key: value
+        for key, value in metadata.items()
+        if value is not None
+    }
+
+
+def _search_filter(
+    *,
+    project_id: str,
+    company_id: str | None,
+    scope: str | None,
+    visibility: str | None,
+) -> dict:
+    filters: list[dict] = [{"project_id": {"$eq": project_id}}]
+    if company_id:
+        filters.append({"company_id": {"$eq": company_id}})
+    if scope:
+        filters.append({"scope": {"$eq": scope}})
+    if visibility:
+        filters.append({"visibility": {"$eq": visibility}})
+    if len(filters) == 1:
+        return filters[0]
+    return {"$and": filters}
+
+
+def _source_metadata(metadata: dict) -> dict:
+    content = str(metadata.get("text") or metadata.get("content") or "")
+    chunk_index = metadata.get("chunk_index")
+    upload_id = metadata.get("upload_id")
+    source_id = f"{upload_id}:{chunk_index}" if upload_id is not None and chunk_index is not None else upload_id
+    return {
+        **metadata,
+        "source_id": source_id,
+        "snippet": content[:500],
+    }
 
 
 def _resolve_index_dimension(pc, index_name: str) -> int:
