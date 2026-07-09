@@ -157,6 +157,242 @@ def test_ai_chat_generate_accepts_null_chat_history(monkeypatch) -> None:
     assert response.json()["data"]["chat_history"] is None
 
 
+def test_ai_chat_generate_answers_simple_greeting_without_database(monkeypatch) -> None:
+    from app.services import chat_service
+
+    def fail_get_session():
+        raise AssertionError("Greeting should not read database context.")
+
+    monkeypatch.setattr(chat_service, "get_session", fail_get_session)
+
+    response = client.post(
+        "/api/v1/ai/chat/generate",
+        headers=auth_headers(),
+        json={
+            "user_id": 15,
+            "company_id": 2,
+            "message": "الووووو",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Teamoria AI" in response.json()["data"]["reply"]
+    assert response.json()["data"]["sources_used"] == []
+
+
+def test_ai_chat_generate_answers_general_question_without_database(monkeypatch) -> None:
+    from app.services import chat_service
+
+    class FakeLlmService:
+        def answer_general_with_history(self, question, chat_history):
+            return f"general reply: {question}"
+
+    def fail_get_session():
+        raise AssertionError("General questions should not read database context.")
+
+    monkeypatch.setattr(chat_service, "LlmService", lambda: FakeLlmService())
+    monkeypatch.setattr(chat_service, "get_session", fail_get_session)
+
+    response = client.post(
+        "/api/v1/ai/chat/generate",
+        headers=auth_headers(),
+        json={
+            "user_id": 15,
+            "company_id": 2,
+            "message": "اشرحلي شو يعني agile",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["reply"] == "general reply: اشرحلي شو يعني agile"
+    assert response.json()["data"]["sources_used"] == []
+
+
+def test_ai_chat_generate_routes_task_questions_to_tasks(monkeypatch) -> None:
+    from app.services import chat_service
+
+    class FakeSession:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeRepository:
+        def __init__(self, session):
+            pass
+
+        def ai_chat_identity_exists(self, **kwargs):
+            return {
+                "user_exists": True,
+                "company_exists": True,
+                "user_in_company": True,
+            }
+
+        def ai_chat_visible_tasks(self, **kwargs):
+            return [
+                {
+                    "id": "task-1",
+                    "project_id": "project-1",
+                    "title": "Prepare frontend demo",
+                    "description": "Build the demo screen.",
+                    "status": "open",
+                    "priority": "high",
+                    "due_date": None,
+                    "project_name": "Launch",
+                    "access_reason": "assigned",
+                }
+            ]
+
+    class FakeLlmService:
+        def answer_with_history(self, question, context, chat_history):
+            assert "Prepare frontend demo" in context
+            return "You have one open task."
+
+    monkeypatch.setattr(chat_service, "get_session", lambda: FakeSession())
+    monkeypatch.setattr(chat_service, "LaravelRepository", FakeRepository)
+
+    service = chat_service.AiChatGenerateService(llm_service=FakeLlmService())
+    response = service.generate(
+        chat_service.AiChatGenerateRequest(
+            user_id=15,
+            company_id=2,
+            message="شو المهام عندي؟",
+        )
+    )
+
+    assert response.data.reply == "You have one open task."
+    assert response.data.sources_used == ["Prepare frontend demo"]
+
+
+def test_ai_chat_generate_reports_invalid_identity(monkeypatch) -> None:
+    from app.services import chat_service
+
+    class FakeSession:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeRepository:
+        def __init__(self, session):
+            pass
+
+        def ai_chat_identity_exists(self, **kwargs):
+            return {
+                "user_exists": False,
+                "company_exists": False,
+                "user_in_company": False,
+            }
+
+        def ai_chat_visible_tasks(self, **kwargs):
+            return []
+
+    monkeypatch.setattr(chat_service, "get_session", lambda: FakeSession())
+    monkeypatch.setattr(chat_service, "LaravelRepository", FakeRepository)
+
+    response = chat_service.AiChatGenerateService().generate(
+        chat_service.AiChatGenerateRequest(
+            user_id=15,
+            company_id=2,
+            message="شو المهام عندي؟",
+        )
+    )
+
+    assert "user_id=15" in response.data.reply
+    assert "company_id=2" in response.data.reply
+
+
+def test_ai_chat_generate_routes_project_questions_to_projects(monkeypatch) -> None:
+    from app.services import chat_service
+
+    class FakeSession:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeRepository:
+        def __init__(self, session):
+            pass
+
+        def ai_chat_identity_exists(self, **kwargs):
+            return {
+                "user_exists": True,
+                "company_exists": True,
+                "user_in_company": True,
+            }
+
+        def ai_chat_visible_projects(self, **kwargs):
+            return [
+                {
+                    "id": "project-1",
+                    "name": "Active Product Launch",
+                    "status": "active",
+                    "progress": 35,
+                    "description": "Launch project",
+                    "access_reason": "member",
+                },
+                {
+                    "id": "project-2",
+                    "name": "Completed Brand Refresh",
+                    "status": "completed",
+                    "progress": 100,
+                    "description": "",
+                    "access_reason": "company",
+                },
+            ]
+
+    class FakeLlmService:
+        def answer_with_history(self, question, context, chat_history):
+            assert "Visible projects count: 2" in context
+            return "عندك مشروعين."
+
+    monkeypatch.setattr(chat_service, "get_session", lambda: FakeSession())
+    monkeypatch.setattr(chat_service, "LaravelRepository", FakeRepository)
+
+    service = chat_service.AiChatGenerateService(llm_service=FakeLlmService())
+    response = service.generate(
+        chat_service.AiChatGenerateRequest(
+            user_id=15,
+            company_id=2,
+            message="حاليا اكم مشروع عندي",
+        )
+    )
+
+    assert response.data.reply == "عندك مشروعين."
+    assert response.data.sources_used == ["Active Product Launch", "Completed Brand Refresh"]
+
+
+def test_ai_chat_generate_falls_back_to_task_list_when_llm_fails() -> None:
+    from app.services.chat_service import AiChatGenerateService
+
+    class BrokenLlmService:
+        def answer_with_history(self, question, context, chat_history):
+            raise RuntimeError("LLM unavailable")
+
+    service = AiChatGenerateService(llm_service=BrokenLlmService())
+    reply = service._context_fallback_reply(  # type: ignore[attr-defined]
+        "tasks",
+        [
+            {
+                "title": "Prepare frontend demo",
+                "status": "todo",
+                "priority": "high",
+                "project_name": "Launch",
+            }
+        ],
+        [],
+        [],
+        [],
+    )
+
+    assert "وجدت 1 مهام متاحة" in reply
+    assert "Prepare frontend demo" in reply
+
+
 def test_ai_chat_context_includes_latest_upload_metadata() -> None:
     from app.services.chat_service import AiChatGenerateService
 

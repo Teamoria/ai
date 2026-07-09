@@ -68,20 +68,73 @@ class AiChatGenerateService:
         self.llm_service = llm_service or LlmService()
 
     def generate(self, request: AiChatGenerateRequest) -> AiChatGenerateResponse:
+        chat_history = request.chat_history or []
+        response_chat_history = request.chat_history or None
+        casual_reply = self._casual_reply(request.message)
+        if casual_reply is not None:
+            return self._fallback_response(
+                reply=casual_reply,
+                chat_history=request.chat_history,
+            )
+
+        intent = self._intent(request.message)
+        if intent == "general":
+            return AiChatGenerateResponse(
+                status="success",
+                data=AiChatGenerateData(
+                    reply=self.llm_service.answer_general_with_history(request.message, chat_history),
+                    sources_used=[],
+                    chat_history=response_chat_history,
+                ),
+            )
+
         try:
             with get_session() as session:
                 repository = LaravelRepository(session)
                 project_id = str(request.project_id) if request.project_id is not None else None
-                uploads = repository.ai_chat_visible_uploads(
-                    user_id=str(request.user_id),
-                    company_id=str(request.company_id),
-                    project_id=project_id,
-                )
-                chunks = repository.ai_chat_knowledge_chunks(
-                    user_id=str(request.user_id),
-                    company_id=str(request.company_id),
-                    project_id=project_id,
-                )
+                if intent == "tasks":
+                    identity = repository.ai_chat_identity_exists(
+                        user_id=str(request.user_id),
+                        company_id=str(request.company_id),
+                    )
+                    tasks = repository.ai_chat_visible_tasks(
+                        user_id=str(request.user_id),
+                        company_id=str(request.company_id),
+                        project_id=project_id,
+                    )
+                    projects: list[dict] = []
+                    uploads: list[dict] = []
+                    chunks: list[dict] = []
+                elif intent == "projects":
+                    identity = repository.ai_chat_identity_exists(
+                        user_id=str(request.user_id),
+                        company_id=str(request.company_id),
+                    )
+                    projects = repository.ai_chat_visible_projects(
+                        user_id=str(request.user_id),
+                        company_id=str(request.company_id),
+                        project_id=project_id,
+                    )
+                    tasks = []
+                    uploads: list[dict] = []
+                    chunks: list[dict] = []
+                else:
+                    identity = repository.ai_chat_identity_exists(
+                        user_id=str(request.user_id),
+                        company_id=str(request.company_id),
+                    )
+                    projects = []
+                    tasks = []
+                    uploads = repository.ai_chat_visible_uploads(
+                        user_id=str(request.user_id),
+                        company_id=str(request.company_id),
+                        project_id=project_id,
+                    )
+                    chunks = repository.ai_chat_knowledge_chunks(
+                        user_id=str(request.user_id),
+                        company_id=str(request.company_id),
+                        project_id=project_id,
+                    )
         except Exception:
             logger.exception("AI chat failed to read visible database context.")
             return self._fallback_response(
@@ -97,11 +150,23 @@ class AiChatGenerateService:
 
         sources_used = self._source_names(uploads, chunks)
         context = self._context(uploads, chunks)
-        chat_history = request.chat_history or []
-        response_chat_history = request.chat_history or None
+        if intent == "tasks":
+            context = self._task_context(tasks)
+            sources_used = [str(task.get("title")) for task in tasks if task.get("title")]
+        elif intent == "projects":
+            context = self._project_context(projects)
+            sources_used = [str(project.get("name")) for project in projects if project.get("name")]
 
         if not context:
-            reply = self._empty_context_reply()
+            identity_reply = self._identity_problem_reply(identity, request)
+            if identity_reply is not None:
+                reply = identity_reply
+            elif intent == "tasks":
+                reply = self._empty_task_reply()
+            elif intent == "projects":
+                reply = self._empty_project_reply()
+            else:
+                reply = self._empty_context_reply()
         else:
             try:
                 reply = self.llm_service.answer_with_history(
@@ -111,12 +176,7 @@ class AiChatGenerateService:
                 )
             except Exception:
                 logger.exception("AI chat failed to generate LLM reply.")
-                reply = (
-                    "\u0642\u0631\u0623\u062a \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629\u060c "
-                    "\u0644\u0643\u0646 \u062a\u0639\u0630\u0631 \u062a\u0648\u0644\u064a\u062f \u0631\u062f "
-                    "\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a "
-                    "\u062d\u0627\u0644\u064a\u0627. \u062c\u0631\u0628 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."
-                )
+                reply = self._context_fallback_reply(intent, tasks, projects, uploads, chunks)
 
         return AiChatGenerateResponse(
             status="success",
@@ -138,6 +198,47 @@ class AiChatGenerateService:
             parts.append(chunk_context)
 
         return "\n\n".join(parts)
+
+    def _task_context(self, tasks: list[dict]) -> str:
+        if not tasks:
+            return ""
+
+        lines = ["Visible tasks, ordered by due date or latest update:"]
+        for index, task in enumerate(tasks, start=1):
+            details = [
+                f"{index}. Task: {task.get('title')}",
+                f"Task ID: {task.get('id')}",
+                f"Project: {task.get('project_name') or ''}",
+                f"Project ID: {task.get('project_id') or ''}",
+                f"Status: {task.get('status') or ''}",
+                f"Priority: {task.get('priority') or ''}",
+                f"Due date: {task.get('due_date') or ''}",
+                f"Access: {task.get('access_reason') or 'visible'}",
+                f"Description: {task.get('description') or ''}",
+            ]
+            lines.append("\n".join(details))
+
+        return "\n\n".join(lines)
+
+    def _project_context(self, projects: list[dict]) -> str:
+        if not projects:
+            return ""
+
+        lines = [f"Visible projects count: {len(projects)}", "Visible projects:"]
+        for index, project in enumerate(projects, start=1):
+            details = [
+                f"{index}. Project: {project.get('name')}",
+                f"Project ID: {project.get('id')}",
+                f"Status: {project.get('status') or ''}",
+                f"Progress: {project.get('progress') or 0}",
+                f"Start date: {project.get('start_date') or ''}",
+                f"End date: {project.get('end_date') or ''}",
+                f"Access: {project.get('access_reason') or 'visible'}",
+                f"Description: {project.get('description') or ''}",
+            ]
+            lines.append("\n".join(details))
+
+        return "\n\n".join(lines)
 
     def _upload_context(self, uploads: list[dict]) -> str:
         if not uploads:
@@ -197,6 +298,187 @@ class AiChatGenerateService:
             "\u062a\u0623\u0643\u062f \u0645\u0646 \u0648\u062c\u0648\u062f \u0645\u0644\u0641\u0627\u062a "
             "\u0645\u0639\u0627\u0644\u062c\u0629 \u0623\u0648 \u0635\u0644\u0627\u062d\u064a\u0627\u062a "
             "\u0648\u0635\u0648\u0644 \u0645\u0646\u0627\u0633\u0628\u0629."
+        )
+
+    def _empty_task_reply(self) -> str:
+        return (
+            "لا أستطيع العثور على مهام متاحة لهذا المستخدم حالياً. "
+            "تأكد من أن المستخدم عضو في المشروع أو أن المهام مسندة له."
+        )
+
+    def _empty_project_reply(self) -> str:
+        return (
+            "لا أستطيع العثور على مشاريع متاحة لهذا المستخدم حالياً. "
+            "تأكد من أن المستخدم تابع للشركة أو مضاف على المشاريع."
+        )
+
+    def _context_fallback_reply(
+        self,
+        intent: str,
+        tasks: list[dict],
+        projects: list[dict],
+        uploads: list[dict],
+        chunks: list[dict],
+    ) -> str:
+        if intent == "tasks" and tasks:
+            lines = [f"وجدت {len(tasks)} مهام متاحة:"]
+            for task in tasks[:10]:
+                title = task.get("title") or "بدون عنوان"
+                status = task.get("status") or "غير محدد"
+                priority = task.get("priority") or "غير محددة"
+                project_name = task.get("project_name") or "بدون مشروع"
+                lines.append(f"- {title} | الحالة: {status} | الأولوية: {priority} | المشروع: {project_name}")
+            return "\n".join(lines)
+
+        if intent == "projects" and projects:
+            lines = [f"عندك {len(projects)} مشاريع متاحة:"]
+            for project in projects[:10]:
+                name = project.get("name") or "بدون اسم"
+                status = project.get("status") or "غير محدد"
+                progress = project.get("progress") or 0
+                lines.append(f"- {name} | الحالة: {status} | التقدم: {progress}%")
+            return "\n".join(lines)
+
+        if intent == "files" and (uploads or chunks):
+            names = self._source_names(uploads, chunks)
+            lines = [f"وجدت {len(names)} ملفات/مصادر متاحة:"]
+            for name in names[:10]:
+                lines.append(f"- {name}")
+            return "\n".join(lines)
+
+        return (
+            "\u0642\u0631\u0623\u062a \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629\u060c "
+            "\u0644\u0643\u0646 \u062a\u0639\u0630\u0631 \u062a\u0648\u0644\u064a\u062f \u0631\u062f "
+            "\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a "
+            "\u062d\u0627\u0644\u064a\u0627. \u062c\u0631\u0628 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."
+        )
+
+    def _identity_problem_reply(self, identity: dict[str, bool], request: AiChatGenerateRequest) -> str | None:
+        if not identity["user_exists"] and not identity["company_exists"]:
+            return (
+                "لا أستطيع قراءة بيانات المستخدم لأن user_id و company_id المرسلة لا تطابق قاعدة البيانات. "
+                f"وصلني user_id={request.user_id} و company_id={request.company_id}. "
+                "أرسل UUID الحقيقي من Laravel auth user/company."
+            )
+        if not identity["user_exists"]:
+            return (
+                f"لا أستطيع قراءة بيانات المستخدم لأن user_id={request.user_id} غير موجود في قاعدة البيانات. "
+                "أرسل UUID الحقيقي للمستخدم."
+            )
+        if not identity["company_exists"]:
+            return (
+                f"لا أستطيع قراءة بيانات الشركة لأن company_id={request.company_id} غير موجود في قاعدة البيانات. "
+                "أرسل UUID الحقيقي للشركة."
+            )
+        if not identity["user_in_company"]:
+            return (
+                "المستخدم موجود والشركة موجودة، لكن المستخدم غير تابع لهذه الشركة حسب قاعدة البيانات. "
+                "تحقق من company_id المرسل مع المستخدم الحالي."
+            )
+
+        return None
+
+    def _casual_reply(self, message: str) -> str | None:
+        normalized = self._normalized_message(message)
+        repeated_chars_normalized = self._collapse_repeated_chars(normalized)
+
+        greetings = {
+            "الو",
+            "الوو",
+            "هلا",
+            "اهلا",
+            "أهلا",
+            "مرحبا",
+            "مراحب",
+            "السلام عليكم",
+            "hi",
+            "hello",
+            "hey",
+        }
+        if normalized in greetings or repeated_chars_normalized in greetings:
+            return "أهلا، معك Teamoria AI. كيف أقدر أساعدك؟"
+
+        return None
+
+    def _intent(self, message: str) -> str:
+        normalized = self._normalized_message(message)
+        file_words = {
+            "file",
+            "files",
+            "upload",
+            "uploads",
+            "document",
+            "documents",
+            "pdf",
+            "ملف",
+            "ملفات",
+            "مرفق",
+            "مرفقات",
+            "مستند",
+            "مستندات",
+            "وثيقة",
+            "وثائق",
+            "رفع",
+            "مرفوع",
+            "المرفوعة",
+        }
+        task_words = {
+            "task",
+            "tasks",
+            "todo",
+            "todos",
+            "assignment",
+            "assignments",
+            "مهمة",
+            "مهام",
+            "تاسك",
+            "تاسكات",
+            "واجب",
+            "واجبات",
+            "المهمام",
+            "المهام",
+            "مسند",
+            "المسندة",
+        }
+        platform_words = {
+            "teamoria",
+            "project",
+            "projects",
+            "company",
+            "workspace",
+            "مشروع",
+            "مشاريع",
+            "شركة",
+            "الشركة",
+            "منصة",
+            "تيموريا",
+        }
+        words = set(normalized.split())
+        arabic_task_terms = {"مهمة", "مهام", "تاسك", "تاسكات", "واجب", "واجبات", "مسند"}
+        arabic_file_terms = {"ملف", "ملفات", "مرفق", "مرفقات", "مستند", "مستندات", "وثيقة", "وثائق"}
+        arabic_project_terms = {"مشروع", "مشاريع"}
+        arabic_platform_terms = {"شركة", "منصة", "تيموريا", "داتا", "بيانات"}
+
+        if words & task_words or any(term in normalized for term in arabic_task_terms):
+            return "tasks"
+        if any(term in normalized for term in arabic_project_terms) or words & {"project", "projects"}:
+            return "projects"
+        if words & file_words or any(term in normalized for term in arabic_file_terms):
+            return "files"
+        if words & platform_words or any(term in normalized for term in arabic_platform_terms):
+            return "files"
+
+        return "general"
+
+    def _normalized_message(self, message: str) -> str:
+        normalized = " ".join(message.strip().lower().split())
+        return normalized.strip("؟?!.،,؛:()[]{}\"'")
+
+    def _collapse_repeated_chars(self, message: str) -> str:
+        return "".join(
+            char
+            for index, char in enumerate(message)
+            if index == 0 or char != message[index - 1]
         )
 
     def _fallback_response(
