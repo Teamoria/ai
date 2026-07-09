@@ -11,6 +11,7 @@ WORKDIR /build
 # System deps needed to compile some Python packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        ca-certificates \
         build-essential \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -34,6 +35,7 @@ LABEL description="Teamoria AI Service — FastAPI"
 # System runtime deps (psycopg needs libpq, tesseract for OCR, ffmpeg for media)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        ca-certificates \
         libpq5 \
         ffmpeg \
         tesseract-ocr \

@@ -40,7 +40,7 @@ services:
         required: false  # Copy .env.example → .env before deploying
     environment:
       PORT: 8000
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/teamoria_ai
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@db:5432/teamoria_ai}
     depends_on:
       db:
         condition: service_healthy
