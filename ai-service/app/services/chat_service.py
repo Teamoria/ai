@@ -1,8 +1,10 @@
 """Chat session and message service."""
 
 import logging
+from urllib.parse import urlsplit
 
 from app.core.database import get_session
+from app.core.config import settings
 from app.repositories.laravel_repository import LaravelRepository
 from app.schemas.chat import (
     AiChatGenerateData,
@@ -135,8 +137,18 @@ class AiChatGenerateService:
                         company_id=str(request.company_id),
                         project_id=project_id,
                     )
-        except Exception:
-            logger.exception("AI chat failed to read visible database context.")
+        except Exception as exc:
+            logger.exception(
+                "AI chat failed to read visible database context.",
+                extra={
+                    "ai_chat_intent": intent,
+                    "ai_chat_user_id": str(request.user_id),
+                    "ai_chat_company_id": str(request.company_id),
+                    "ai_chat_project_id": project_id,
+                    "database": self._database_diagnostic(),
+                    "error_type": type(exc).__name__,
+                },
+            )
             return self._fallback_response(
                 reply=(
                     "\u062a\u0639\u0630\u0631 \u0642\u0631\u0627\u0621\u0629 \u0628\u064a\u0627\u0646\u0627\u062a "
@@ -506,3 +518,15 @@ class AiChatGenerateService:
                 names.append(name)
 
         return names
+
+    def _database_diagnostic(self) -> dict[str, str]:
+        try:
+            parsed = urlsplit(settings.database_url)
+        except Exception:
+            return {"scheme": "invalid", "host": "", "database": ""}
+
+        return {
+            "scheme": parsed.scheme,
+            "host": parsed.hostname or "",
+            "database": parsed.path.lstrip("/").split("?", 1)[0],
+        }
