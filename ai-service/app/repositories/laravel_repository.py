@@ -311,8 +311,8 @@ class LaravelRepository:
         if project_id is not None:
             project_filter = """
                   and (
-                    cast(u.project_id as char) = :project_id
-                    or cast(kc.project_id as char) = :project_id
+                    cast(u.project_id as varchar) = :project_id
+                    or cast(kc.project_id as varchar) = :project_id
                   )
             """
             params["project_id"] = project_id
@@ -338,14 +338,14 @@ class LaravelRepository:
                   and kc.content <> ''
                   {project_filter}
                   and (
-                    cast(u.user_id as char) = :user_id
+                    cast(u.user_id as varchar) = :user_id
                     or exists (
                         select 1
                         from upload_permissions up
                         where up.upload_id = u.id
-                          and cast(up.user_id as char) = :user_id
+                          and cast(up.user_id as varchar) = :user_id
                     )
-                    or cast(u.company_id as char) = :company_id
+                    or cast(u.company_id as varchar) = :company_id
                   )
                 order by coalesce(u.upload_date, u.updated_at, kc.updated_at) desc, kc.id desc
                 limit :limit
@@ -365,7 +365,7 @@ class LaravelRepository:
         project_filter = ""
         params: dict[str, Any] = {"user_id": user_id, "company_id": company_id, "limit": limit}
         if project_id is not None:
-            project_filter = "and cast(u.project_id as char) = :project_id"
+            project_filter = "and cast(u.project_id as varchar) = :project_id"
             params["project_id"] = project_id
 
         rows = self.session.execute(
@@ -386,26 +386,26 @@ class LaravelRepository:
                     u.upload_date,
                     u.updated_at,
                     case
-                        when cast(u.user_id as char) = :user_id then 'owned'
+                        when cast(u.user_id as varchar) = :user_id then 'owned'
                         when exists (
                             select 1
                             from upload_permissions up
                             where up.upload_id = u.id
-                              and cast(up.user_id as char) = :user_id
+                              and cast(up.user_id as varchar) = :user_id
                         ) then 'shared'
-                        when cast(u.company_id as char) = :company_id then 'company'
+                        when cast(u.company_id as varchar) = :company_id then 'company'
                         else 'visible'
                     end as access_reason
                 from uploads u
                 where (
-                    cast(u.user_id as char) = :user_id
+                    cast(u.user_id as varchar) = :user_id
                     or exists (
                         select 1
                         from upload_permissions up
                         where up.upload_id = u.id
-                          and cast(up.user_id as char) = :user_id
+                          and cast(up.user_id as varchar) = :user_id
                     )
-                    or cast(u.company_id as char) = :company_id
+                    or cast(u.company_id as varchar) = :company_id
                 )
                 {project_filter}
                 order by coalesce(u.upload_date, u.updated_at) desc, u.id desc
