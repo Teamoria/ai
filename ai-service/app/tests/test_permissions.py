@@ -1,5 +1,7 @@
 """Permission scope tests."""
 
+from types import SimpleNamespace
+
 from app.repositories.laravel_repository import LaravelRepository, LaravelUserContext
 
 
@@ -12,6 +14,11 @@ class CaptureSession:
         self.statement = str(statement)
         self.params = params or {}
         return []
+
+
+class MySqlCaptureSession(CaptureSession):
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="mysql"))
 
 
 def test_member_tasks_are_limited_to_assigned_tasks_or_managed_projects() -> None:
@@ -125,3 +132,14 @@ def test_ai_chat_visible_uploads_reads_latest_visible_files() -> None:
     assert session.params["user_id"] == "15"
     assert session.params["company_id"] == "2"
     assert session.params["project_id"] == "9"
+
+
+def test_ai_chat_queries_use_mysql_compatible_casts_for_mysql() -> None:
+    session = MySqlCaptureSession()
+    repository = LaravelRepository(session)  # type: ignore[arg-type]
+
+    repository.ai_chat_visible_uploads(user_id="15", company_id="2", project_id="9")
+
+    assert "cast(u.user_id as char) = :user_id" in session.statement
+    assert "cast(u.project_id as char) = :project_id" in session.statement
+    assert "cast(u.user_id as varchar) = :user_id" not in session.statement
