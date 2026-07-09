@@ -107,6 +107,7 @@ class AiChatGenerateService:
                     projects: list[dict] = []
                     uploads: list[dict] = []
                     chunks: list[dict] = []
+                    summaries: list[dict] = []
                 elif intent == "projects":
                     identity = repository.ai_chat_identity_exists(
                         user_id=str(request.user_id),
@@ -120,6 +121,7 @@ class AiChatGenerateService:
                     tasks = []
                     uploads: list[dict] = []
                     chunks: list[dict] = []
+                    summaries: list[dict] = []
                 else:
                     identity = repository.ai_chat_identity_exists(
                         user_id=str(request.user_id),
@@ -132,6 +134,8 @@ class AiChatGenerateService:
                         company_id=str(request.company_id),
                         project_id=project_id,
                     )
+                    upload_ids = [str(upload["id"]) for upload in uploads if upload.get("id")]
+                    summaries = repository.ai_chat_meeting_summaries(upload_ids)
                     chunks = repository.ai_chat_knowledge_chunks(
                         user_id=str(request.user_id),
                         company_id=str(request.company_id),
@@ -161,7 +165,7 @@ class AiChatGenerateService:
             )
 
         sources_used = self._source_names(uploads, chunks)
-        context = self._context(uploads, chunks)
+        context = self._context(uploads, chunks, summaries)
         if intent == "tasks":
             context = self._task_context(tasks)
             sources_used = [str(task.get("title")) for task in tasks if task.get("title")]
@@ -188,7 +192,7 @@ class AiChatGenerateService:
                 )
             except Exception:
                 logger.exception("AI chat failed to generate LLM reply.")
-                reply = self._context_fallback_reply(intent, tasks, projects, uploads, chunks)
+                reply = self._context_fallback_reply(intent, tasks, projects, uploads, chunks, summaries)
 
         return AiChatGenerateResponse(
             status="success",
@@ -199,11 +203,15 @@ class AiChatGenerateService:
             ),
         )
 
-    def _context(self, uploads: list[dict], chunks: list[dict]) -> str:
+    def _context(self, uploads: list[dict], chunks: list[dict], summaries: list[dict] | None = None) -> str:
         parts: list[str] = []
         upload_context = self._upload_context(uploads)
         if upload_context:
             parts.append(upload_context)
+
+        summary_context = self._summary_context(summaries or [])
+        if summary_context:
+            parts.append(summary_context)
 
         chunk_context = self._chunk_context(chunks)
         if chunk_context:
@@ -279,6 +287,30 @@ class AiChatGenerateService:
 
         return "\n\n".join(lines)
 
+    def _summary_context(self, summaries: list[dict]) -> str:
+        if not summaries:
+            return ""
+
+        lines = ["Available processed file summaries, ordered newest first:"]
+        for index, summary in enumerate(summaries, start=1):
+            summary_text = str(summary.get("summary") or "").strip()
+            transcript_text = str(summary.get("transcript") or "").strip()
+            if not summary_text and not transcript_text:
+                continue
+
+            details = [
+                f"{index}. File: {summary.get('file_name') or 'unknown source'}",
+                f"Upload ID: {summary.get('upload_id')}",
+                f"Updated at: {summary.get('updated_at') or summary.get('upload_updated_at') or ''}",
+            ]
+            if summary_text:
+                details.append(f"Summary: {summary_text}")
+            elif transcript_text:
+                details.append(f"Transcript excerpt: {transcript_text[:2000]}")
+            lines.append("\n".join(details))
+
+        return "\n\n".join(lines) if len(lines) > 1 else ""
+
     def _chunk_context(self, chunks: list[dict]) -> str:
         parts: list[str] = []
         for index, chunk in enumerate(chunks, start=1):
@@ -331,6 +363,7 @@ class AiChatGenerateService:
         projects: list[dict],
         uploads: list[dict],
         chunks: list[dict],
+        summaries: list[dict] | None = None,
     ) -> str:
         if intent == "tasks" and tasks:
             lines = [f"وجدت {len(tasks)} مهام متاحة:"]
@@ -352,6 +385,10 @@ class AiChatGenerateService:
             return "\n".join(lines)
 
         if intent == "files" and (uploads or chunks):
+            summary_reply = self._summary_fallback_reply(summaries or [])
+            if summary_reply:
+                return summary_reply
+
             names = self._source_names(uploads, chunks)
             lines = [f"وجدت {len(names)} ملفات/مصادر متاحة:"]
             for name in names[:10]:
@@ -364,6 +401,19 @@ class AiChatGenerateService:
             "\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a "
             "\u062d\u0627\u0644\u064a\u0627. \u062c\u0631\u0628 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."
         )
+
+    def _summary_fallback_reply(self, summaries: list[dict]) -> str:
+        for summary in summaries:
+            file_name = str(summary.get("file_name") or "unknown source")
+            summary_text = str(summary.get("summary") or "").strip()
+            if summary_text:
+                return f"آخر ملخص متاح للملف {file_name}:\n\n{summary_text}"
+
+            transcript_text = str(summary.get("transcript") or "").strip()
+            if transcript_text:
+                return f"لا يوجد ملخص محفوظ للملف {file_name}، لكن هذا مقتطف من محتواه:\n\n{transcript_text[:2000]}"
+
+        return ""
 
     def _identity_problem_reply(self, identity: dict[str, bool], request: AiChatGenerateRequest) -> str | None:
         if not identity["user_exists"] and not identity["company_exists"]:

@@ -430,6 +430,34 @@ class LaravelRepository:
         )
         return [dict(row._mapping) for row in rows]
 
+    def ai_chat_meeting_summaries(self, upload_ids: list[str], limit: int = 10) -> list[dict[str, Any]]:
+        if not upload_ids:
+            return []
+
+        rows = self.session.execute(
+            text(
+                """
+                select
+                    ms.id,
+                    ms.upload_id,
+                    ms.summary,
+                    ms.transcript,
+                    ms.updated_at,
+                    u.file_name,
+                    u.project_id as upload_project_id,
+                    u.upload_date,
+                    u.updated_at as upload_updated_at
+                from meeting_summaries ms
+                join uploads u on u.id = ms.upload_id
+                where ms.upload_id in :upload_ids
+                order by coalesce(u.upload_date, u.updated_at, ms.updated_at) desc, ms.id desc
+                limit :limit
+                """
+            ).bindparams(bindparam("upload_ids", expanding=True)),
+            {"upload_ids": upload_ids, "limit": limit},
+        )
+        return [dict(row._mapping) for row in rows]
+
     def ai_chat_identity_exists(self, user_id: str, company_id: str) -> dict[str, bool]:
         user_exists = self.session.execute(
             text(f"select 1 from users where {self._cast_to_string('id')} = :user_id limit 1"),
