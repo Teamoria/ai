@@ -311,8 +311,8 @@ class LaravelRepository:
         if project_id is not None:
             project_filter = """
                   and (
-                    cast(u.project_id as char) = :project_id
-                    or cast(kc.project_id as char) = :project_id
+                    cast(u.project_id as varchar) = :project_id
+                    or cast(kc.project_id as varchar) = :project_id
                   )
             """
             params["project_id"] = project_id
@@ -338,14 +338,14 @@ class LaravelRepository:
                   and kc.content <> ''
                   {project_filter}
                   and (
-                    cast(u.user_id as char) = :user_id
+                    cast(u.user_id as varchar) = :user_id
                     or exists (
                         select 1
                         from upload_permissions up
                         where up.upload_id = u.id
-                          and cast(up.user_id as char) = :user_id
+                          and cast(up.user_id as varchar) = :user_id
                     )
-                    or cast(u.company_id as char) = :company_id
+                    or cast(u.company_id as varchar) = :company_id
                   )
                 order by coalesce(u.upload_date, u.updated_at, kc.updated_at) desc, kc.id desc
                 limit :limit
@@ -365,7 +365,7 @@ class LaravelRepository:
         project_filter = ""
         params: dict[str, Any] = {"user_id": user_id, "company_id": company_id, "limit": limit}
         if project_id is not None:
-            project_filter = "and cast(u.project_id as char) = :project_id"
+            project_filter = "and cast(u.project_id as varchar) = :project_id"
             params["project_id"] = project_id
 
         rows = self.session.execute(
@@ -386,26 +386,26 @@ class LaravelRepository:
                     u.upload_date,
                     u.updated_at,
                     case
-                        when cast(u.user_id as char) = :user_id then 'owned'
+                        when cast(u.user_id as varchar) = :user_id then 'owned'
                         when exists (
                             select 1
                             from upload_permissions up
                             where up.upload_id = u.id
-                              and cast(up.user_id as char) = :user_id
+                              and cast(up.user_id as varchar) = :user_id
                         ) then 'shared'
-                        when cast(u.company_id as char) = :company_id then 'company'
+                        when cast(u.company_id as varchar) = :company_id then 'company'
                         else 'visible'
                     end as access_reason
                 from uploads u
                 where (
-                    cast(u.user_id as char) = :user_id
+                    cast(u.user_id as varchar) = :user_id
                     or exists (
                         select 1
                         from upload_permissions up
                         where up.upload_id = u.id
-                          and cast(up.user_id as char) = :user_id
+                          and cast(up.user_id as varchar) = :user_id
                     )
-                    or cast(u.company_id as char) = :company_id
+                    or cast(u.company_id as varchar) = :company_id
                 )
                 {project_filter}
                 order by coalesce(u.upload_date, u.updated_at) desc, u.id desc
@@ -418,11 +418,11 @@ class LaravelRepository:
 
     def ai_chat_identity_exists(self, user_id: str, company_id: str) -> dict[str, bool]:
         user_exists = self.session.execute(
-            text("select 1 from users where cast(id as char) = :user_id limit 1"),
+            text("select 1 from users where cast(id as varchar) = :user_id limit 1"),
             {"user_id": user_id},
         ).scalar() is not None
         company_exists = self.session.execute(
-            text("select 1 from companies where cast(id as char) = :company_id limit 1"),
+            text("select 1 from companies where cast(id as varchar) = :company_id limit 1"),
             {"company_id": company_id},
         ).scalar() is not None
         user_in_company = self.session.execute(
@@ -430,8 +430,8 @@ class LaravelRepository:
                 """
                 select 1
                 from users
-                where cast(id as char) = :user_id
-                  and cast(company_id as char) = :company_id
+                where cast(id as varchar) = :user_id
+                  and cast(company_id as varchar) = :company_id
                 limit 1
                 """
             ),
@@ -454,7 +454,7 @@ class LaravelRepository:
         project_filter = ""
         params: dict[str, Any] = {"user_id": user_id, "company_id": company_id, "limit": limit}
         if project_id is not None:
-            project_filter = "and cast(p.id as char) = :project_id"
+            project_filter = "and cast(p.id as varchar) = :project_id"
             params["project_id"] = project_id
 
         rows = self.session.execute(
@@ -475,21 +475,21 @@ class LaravelRepository:
                             select 1
                             from project_user pu
                             where pu.project_id = p.id
-                              and cast(pu.user_id as char) = :user_id
+                              and cast(pu.user_id as varchar) = :user_id
                         ) then 'member'
-                        when cast(p.company_id as char) = :company_id then 'company'
+                        when cast(p.company_id as varchar) = :company_id then 'company'
                         else 'visible'
                     end as access_reason
                 from projects p
                 where p.deleted_at is null
                   {project_filter}
                   and (
-                    cast(p.company_id as char) = :company_id
+                    cast(p.company_id as varchar) = :company_id
                     or exists (
                         select 1
                         from project_user pu
                         where pu.project_id = p.id
-                          and cast(pu.user_id as char) = :user_id
+                          and cast(pu.user_id as varchar) = :user_id
                     )
                   )
                 order by p.updated_at desc, p.id desc
@@ -510,7 +510,7 @@ class LaravelRepository:
         project_filter = ""
         params: dict[str, Any] = {"user_id": user_id, "company_id": company_id, "limit": limit}
         if project_id is not None:
-            project_filter = "and cast(t.project_id as char) = :project_id"
+            project_filter = "and cast(t.project_id as varchar) = :project_id"
             params["project_id"] = project_id
 
         rows = self.session.execute(
@@ -531,15 +531,15 @@ class LaravelRepository:
                             select 1
                             from task_user tu
                             where tu.task_id = t.id
-                              and cast(tu.user_id as char) = :user_id
+                              and cast(tu.user_id as varchar) = :user_id
                         ) then 'assigned'
                         when exists (
                             select 1
                             from project_user pu
                             where pu.project_id = t.project_id
-                              and cast(pu.user_id as char) = :user_id
+                              and cast(pu.user_id as varchar) = :user_id
                         ) then 'project_member'
-                        when cast(p.company_id as char) = :company_id then 'company'
+                        when cast(p.company_id as varchar) = :company_id then 'company'
                         else 'visible'
                     end as access_reason
                 from tasks t
@@ -551,15 +551,15 @@ class LaravelRepository:
                         select 1
                         from task_user tu
                         where tu.task_id = t.id
-                          and cast(tu.user_id as char) = :user_id
+                          and cast(tu.user_id as varchar) = :user_id
                     )
                     or exists (
                         select 1
                         from project_user pu
                         where pu.project_id = t.project_id
-                          and cast(pu.user_id as char) = :user_id
+                          and cast(pu.user_id as varchar) = :user_id
                     )
-                    or cast(p.company_id as char) = :company_id
+                    or cast(p.company_id as varchar) = :company_id
                   )
                 order by coalesce(t.due_date, t.updated_at) asc, t.id desc
                 limit :limit
