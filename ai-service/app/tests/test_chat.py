@@ -78,6 +78,62 @@ def test_root_ai_conversations_alias_uses_chat_service() -> None:
     assert "root conversations endpoint" in response.json()["answer"]
 
 
+def test_root_ai_chat_generate_alias_uses_generate_service(monkeypatch) -> None:
+    from app import main
+
+    captured = {}
+
+    class FakeAiChatGenerateService:
+        def generate(self, request):
+            captured["request"] = request
+            return AiChatGenerateResponse(
+                status="success",
+                data=AiChatGenerateData(reply="Root generate endpoint is available."),
+            )
+
+    monkeypatch.setattr(main, "AiChatGenerateService", FakeAiChatGenerateService)
+
+    response = client.post(
+        "/ai/chat/generate",
+        headers=auth_headers(),
+        json={
+            "user_id": 15,
+            "company_id": 2,
+            "message": "Hello",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["reply"] == "Root generate endpoint is available."
+    assert captured["request"].user_id == 15
+
+
+def test_ai_chat_generate_accepts_trailing_slash(monkeypatch) -> None:
+    from app.api.v1 import chat
+
+    class FakeAiChatGenerateService:
+        def generate(self, request):
+            return AiChatGenerateResponse(
+                status="success",
+                data=AiChatGenerateData(reply="Trailing slash endpoint is available."),
+            )
+
+    monkeypatch.setattr(chat, "AiChatGenerateService", FakeAiChatGenerateService)
+
+    response = client.post(
+        "/api/v1/ai/chat/generate/",
+        headers=auth_headers(),
+        json={
+            "user_id": 15,
+            "company_id": 2,
+            "message": "Hello",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["reply"] == "Trailing slash endpoint is available."
+
+
 def test_ai_chat_generate_returns_laravel_ready_payload(monkeypatch) -> None:
     from app.api.v1 import chat
 

@@ -18,16 +18,34 @@ from app.services.retrieval_service import RetrievalService
 router = APIRouter()
 
 
+@router.post(
+    "/chat/",
+    response_model=ChatResponse,
+    dependencies=[Depends(validate_internal_api_key)],
+    include_in_schema=False,
+)
 @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(validate_internal_api_key)])
 def create_chat_response(request: ChatRequest) -> ChatResponse:
     return ChatService().answer(request)
 
 
+@router.post(
+    "/ai/conversations/",
+    response_model=ChatResponse,
+    dependencies=[Depends(validate_internal_api_key)],
+    include_in_schema=False,
+)
 @router.post("/ai/conversations", response_model=ChatResponse, dependencies=[Depends(validate_internal_api_key)])
 def create_ai_conversation(request: ChatRequest) -> ChatResponse:
     return ChatService().answer(request)
 
 
+@router.post(
+    "/ai/chat/generate/",
+    response_model=AiChatGenerateResponse,
+    dependencies=[Depends(validate_internal_api_key)],
+    include_in_schema=False,
+)
 @router.post("/ai/chat/generate", response_model=AiChatGenerateResponse, dependencies=[Depends(validate_internal_api_key)])
 def generate_ai_chat_reply(request: AiChatGenerateRequest) -> AiChatGenerateResponse:
     return AiChatGenerateService().generate(request)
